@@ -97,9 +97,8 @@ func New(o Options) (*Controller, error) {
 	c := &Controller{options: o, config: DefaultConfig(), state: "setup_required", sample: map[string]any{}, history: []map[string]any{}, stop: make(chan struct{}), stopped: make(chan struct{})}
 	data, err := os.ReadFile(filepath.Join(o.DataDir, "config.json"))
 	if err == nil {
-		dec := json.NewDecoder(strings.NewReader(string(data)))
-		dec.DisallowUnknownFields()
-		if err = dec.Decode(&c.config); err != nil {
+		c.config, err = decodeConfig(strings.NewReader(string(data)))
+		if err != nil {
 			return nil, fmt.Errorf("read saved settings: %w", err)
 		}
 	} else if !os.IsNotExist(err) {

@@ -3,7 +3,6 @@ package control
 import (
 	"encoding/json"
 	"errors"
-	"io"
 	"mime"
 	"net"
 	"net/http"
@@ -105,36 +104,8 @@ func (c *Controller) saveHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 65536)
-	// Decode into a raw map first so absent fields, nulls and wrong JSON types
-	// cannot silently become Go zero values accepted as configuration.
-	decoder := json.NewDecoder(r.Body)
-	var raw map[string]json.RawMessage
-	if err = decoder.Decode(&raw); err != nil {
-		decodeFailure(w, err)
-		return
-	}
-	var extra any
-	if err = decoder.Decode(&extra); err != io.EOF {
-		decodeFailure(w, err)
-		return
-	}
-	keys := []string{"public_ipv4", "upstream_dns", "mode", "domains"}
-	if len(raw) != len(keys) {
-		writeJSON(w, 400, map[string]string{"error": "Provide public_ipv4, upstream_dns, mode and domains."})
-		return
-	}
-	for _, key := range keys {
-		value, exists := raw[key]
-		if !exists || string(value) == "null" {
-			writeJSON(w, 400, map[string]string{"error": "All settings fields must be present and non-null."})
-			return
-		}
-	}
-	body, _ := json.Marshal(raw)
-	var value Config
-	strict := json.NewDecoder(strings.NewReader(string(body)))
-	strict.DisallowUnknownFields()
-	if err = strict.Decode(&value); err != nil {
+	value, err := decodeConfig(r.Body)
+	if err != nil {
 		decodeFailure(w, err)
 		return
 	}

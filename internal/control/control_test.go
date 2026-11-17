@@ -233,3 +233,27 @@ func TestRunningSamplerDoesNotProbeHTTPS(t *testing.T) {
 		t.Fatal("ordinary metrics sample connected to HTTPS and inflated its counter")
 	}
 }
+
+func TestCorruptSavedConfigurationDoesNotStart(t *testing.T) {
+	for _, body := range []string{"{}", "null", `{"public_ipv4":"","upstream_dns":"tcp://1.1.1.1:53","mode":"selected","domains":null}`} {
+		o := testOptions(t)
+		if err := os.WriteFile(filepath.Join(o.DataDir, "config.json"), []byte(body), 0600); err != nil {
+			t.Fatal(err)
+		}
+		c, err := New(o)
+		if err == nil {
+			c.Close()
+			t.Fatalf("accepted incomplete saved settings %s", body)
+		}
+	}
+	body, _ := json.Marshal(DefaultConfig())
+	o := testOptions(t)
+	if err := os.WriteFile(filepath.Join(o.DataDir, "config.json"), append(body, []byte(" {}")...), 0600); err != nil {
+		t.Fatal(err)
+	}
+	c, err := New(o)
+	if err == nil {
+		c.Close()
+		t.Fatal("accepted trailing JSON in saved settings")
+	}
+}

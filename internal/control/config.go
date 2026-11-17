@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/netip"
 	"net/url"
@@ -72,6 +73,38 @@ func Validate(c Config, allowEmptyIP bool) (Config, error) {
 	}
 	c.Domains = domains
 	return c, nil
+}
+
+// decodeConfig applies the same schema to saved files and browser requests.
+func decodeConfig(reader io.Reader) (Config, error) {
+	var value Config
+	decoder := json.NewDecoder(reader)
+	var raw map[string]json.RawMessage
+	if err := decoder.Decode(&raw); err != nil {
+		return value, err
+	}
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		if err != nil {
+			return value, err
+		}
+		return value, errors.New("settings must contain one JSON object")
+	}
+	keys := []string{"public_ipv4", "upstream_dns", "mode", "domains"}
+	if len(raw) != len(keys) {
+		return value, errors.New("all four configuration fields must be present")
+	}
+	for _, key := range keys {
+		item, exists := raw[key]
+		if !exists || string(item) == "null" {
+			return value, errors.New("configuration fields must be non-null")
+		}
+	}
+	body, _ := json.Marshal(raw)
+	if err := json.Unmarshal(body, &value); err != nil {
+		return value, err
+	}
+	return value, nil
 }
 
 func atomicWrite(path string, body []byte) error {
