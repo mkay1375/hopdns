@@ -1,6 +1,23 @@
 --- a/pkg/acl/domain.go	2026-11-17 03:47:55
-+++ b/pkg/acl/domain.go	2026-11-17 03:47:55
-@@ -53,16 +53,33 @@
++++ b/pkg/acl/domain.go	2026-11-17 03:49:25
+@@ -38,9 +38,16 @@
+ 
+ // inDomainList returns true if the domain is meant to be SKIPPED and not go through sni proxy
+ func (d *domain) inDomainList(fqdn string) bool {
++	// Bound work on untrusted DNS/SNI input, including the fallback below.
++	if len(fqdn) > 254 {
++		return true
++	}
+ 	if !strings.HasSuffix(fqdn, ".") {
+ 		fqdn = fqdn + "."
+ 	}
++	if len(fqdn) > 254 {
++		return true
++	}
+ 	fqdnLower := strings.ToLower(fqdn)
+ 
+ 	d.mu.RLock()
+@@ -53,16 +60,33 @@
  	// check for prefix match
  	if longestPrefix := d.routePrefixes.GetLongestPrefix(fqdnLower); longestPrefix != nil {
  		// check if the longest prefix is present in the type hashtable as a prefix

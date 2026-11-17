@@ -1,6 +1,7 @@
 package acl
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/golang-collections/collections/tst"
@@ -9,12 +10,18 @@ import (
 // These tests cover the collections/tst terminal-byte mismatch and the shorter
 // valid rule that a bad longest candidate can otherwise conceal.
 func TestHopDNSDomainBoundaries(t *testing.T) {
+	maximum := strings.Repeat("a", 63) + "." + strings.Repeat("b", 63) + "." + strings.Repeat("c", 63) + "." + strings.Repeat("d", 61)
+	oversized := strings.Repeat("a", 65535)
 	cases := []struct {
 		name      string
 		fqdn      string
 		rules     map[string]uint8
 		wantProxy bool
 	}{
+		{"maximum valid hostname", maximum, map[string]uint8{maximum + ".": matchFQDN}, true},
+		{"maximum valid absolute hostname", maximum + ".", map[string]uint8{maximum + ".": matchFQDN}, true},
+		{"oversized input", oversized, map[string]uint8{oversized + ".": matchFQDN}, false},
+		{"254 byte relative hostname", maximum + "x", map[string]uint8{maximum + "x.": matchFQDN}, false},
 		{"exact", "selected.hopdns.test", map[string]uint8{"selected.hopdns.test.": matchFQDN}, true},
 		{"case and trailing dot", "SELECTED.HOPDNS.TEST.", map[string]uint8{"selected.hopdns.test.": matchFQDN}, true},
 		{"subdomain", "cdn.selected.hopdns.test", map[string]uint8{".selected.hopdns.test.": matchSuffix}, true},
