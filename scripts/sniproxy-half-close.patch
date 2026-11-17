@@ -1,0 +1,15 @@
+--- a/pkg/https.go	2026-11-17 03:55:19
++++ b/pkg/https.go	2026-11-17 03:55:19
+@@ -203,6 +203,12 @@
+ 
+ func proxyCopy(errc chan<- error, dst, src net.Conn) {
+ 	_, err := io.Copy(dst, src)
++	// Relay the source FIN without closing the reverse stream. A client can
++	// finish uploading and still need to read its response; an origin can
++	// finish its response without sending a TLS close_notify record.
++	if halfCloser, ok := dst.(interface{ CloseWrite() error }); ok {
++		_ = halfCloser.CloseWrite()
++	}
+ 	errc <- err
+ }
+ 
