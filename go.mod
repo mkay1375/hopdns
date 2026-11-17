@@ -2,7 +2,10 @@ module github.com/mkay1375/hopdns
 
 go 1.26.0
 
-require github.com/mosajjal/sniproxy/v2 v2.4.2
+require (
+	github.com/mosajjal/sniproxy/v2 v2.4.2
+	github.com/shirou/gopsutil/v4 v4.26.10
+)
 
 require (
 	github.com/0xERR0R/expiration-cache v0.2.0 // indirect
@@ -14,10 +17,12 @@ require (
 	github.com/cloudflare/circl v1.6.5 // indirect
 	github.com/cloudflare/odoh-go v1.0.1-0.20230926114050-f39fa019b017 // indirect
 	github.com/deathowl/go-metrics-prometheus v0.0.0-20221009205350-f2a1482ba35b // indirect
+	github.com/ebitengine/purego v0.11.2 // indirect
 	github.com/felixge/fgprof v0.9.5 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/folbricht/routedns v0.1.237 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
+	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/golang-collections/collections v0.0.0-20130729185459-604e922904d3 // indirect
 	github.com/google/pprof v0.0.0-20260802141513-ef3492d7dac3 // indirect
 	github.com/google/uuid v1.6.0 // indirect
@@ -43,6 +48,7 @@ require (
 	github.com/pion/transport/v4 v4.1.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pkg/profile v1.7.0 // indirect
+	github.com/power-devops/perfstat v0.0.0-20260805114148-88456608a4f6 // indirect
 	github.com/prometheus/client_golang v1.24.1 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.70.1 // indirect
@@ -58,10 +64,11 @@ require (
 	github.com/txthinking/socks5 v0.0.0-20260601051520-339b044ab0eb // indirect
 	github.com/yl2chen/cidranger v1.0.2 // indirect
 	github.com/yuin/gopher-lua v1.1.2 // indirect
+	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/crypto v0.55.0 // indirect
 	golang.org/x/net v0.58.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
