@@ -26,11 +26,19 @@ class ConfigurationTests(unittest.TestCase):
         self.assertEqual(domain_csv(['example.com']), 'example.com.,fqdn\n.example.com.,suffix\n')
 
     def test_rejects_invalid_input(self):
-        mutations = [('public_ipv4', '0.0.0.0'), ('public_ipv4', '1.2.3.999'),
+        mutations = [('public_ipv4', 123), ('public_ipv4', True), ('public_ipv4', False),
+                     ('public_ipv4', '0.0.0.0'), ('public_ipv4', '1.2.3.999'),
                      ('public_ipv4', ''), ('mode', 'vpn'), ('domains', ['*.example.com']),
                      ('domains', ['example.com\nreject']), ('domains', ['1.2.3.4']),
                      ('domains', ['-bad.example']), ('domains', ['localhost']),
                      ('upstream_dns', 'udp://dns.example:53'),
+                     ('upstream_dns', 'udp://127.0.0.1:53'),
+                     ('upstream_dns', 'udp://0.0.0.0:53'),
+                     ('upstream_dns', 'udp://224.0.0.1:53'),
+                     ('upstream_dns', 'udp://[::1]:53'),
+                     ('upstream_dns', 'udp://[::ffff:127.0.0.1]:53'),
+                     ('upstream_dns', 'udp://[::ffff:192.0.2.10]:53'),
+                     ('upstream_dns', 'udp://1.1.1.1:0'),
                      ('upstream_dns', 'udp://192.0.2.10:53'),
                      ('upstream_dns', 'udp://user@1.1.1.1:53'),
                      ('upstream_dns', 'udp://1.1.1.1:53/path'),
@@ -44,6 +52,10 @@ class ConfigurationTests(unittest.TestCase):
                     validate_config(candidate)
         with self.assertRaises(ValueError):
             validate_config(dict(config(), unknown=True))
+
+    def test_private_and_ipv6_upstream_resolvers_remain_supported(self):
+        for uri in ('udp://192.168.1.1:53', 'tcp://[2606:4700:4700::1111]:53'):
+            self.assertEqual(validate_config(dict(config(), upstream_dns=uri))['upstream_dns'], uri)
 
     def test_engine_config_has_private_metrics_and_safety(self):
         result = engine_config(config(), '/run/hopdns')

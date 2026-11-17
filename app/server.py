@@ -39,6 +39,8 @@ def validate_config(value, allow_empty_ip=False):
         raise ValueError('Provide public_ipv4, upstream_dns, mode, and domains only.')
     result = copy.deepcopy(value)
     ip = result['public_ipv4']
+    if not isinstance(ip, str):
+        raise ValueError('Public IPv4 must be an IPv4 address string.')
     if not (allow_empty_ip and ip == ''):
         try:
             parsed = ipaddress.IPv4Address(ip)
@@ -51,10 +53,13 @@ def validate_config(value, allow_empty_ip=False):
         raise ValueError('Upstream DNS must be udp://IP:port or tcp://IP:port.')
     try:
         parts = urlsplit(uri)
-        ipaddress.ip_address(parts.hostname or '')
+        upstream_ip = ipaddress.ip_address(parts.hostname or '')
+        address = upstream_ip.ipv4_mapped if isinstance(upstream_ip, ipaddress.IPv6Address) and upstream_ip.ipv4_mapped else upstream_ip
+        if address.is_loopback or address.is_unspecified or address.is_multicast or str(address) == '255.255.255.255':
+            raise ValueError()
         if parts.scheme not in ('udp', 'tcp') or not parts.port or parts.username or parts.password or parts.path or parts.query or parts.fragment:
             raise ValueError()
-        if parts.hostname == ip:
+        if str(address) == ip:
             raise ValueError()
     except (ValueError, TypeError):
         raise ValueError('Use an upstream DNS IP with udp://IP:port or tcp://IP:port, different from the advertised address.') from None
@@ -319,6 +324,7 @@ class Controller:
                 if self.process and self.process.poll() is not None:
                     self.process = None
                     self.started_at = None
+                    self.sample = {}
                     self.state = 'error'
                     self.error = 'Proxy engine exited. Retrying in 15 seconds; check container logs.'
                 if self.config['public_ipv4'] and self.process is None and time.monotonic() - self.last_start >= 15:
