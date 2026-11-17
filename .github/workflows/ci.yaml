@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: Publish the verified image to GHCR
+        description: Publish verified AMD64 and ARM64 images to GHCR
         type: boolean
         required: true
         default: false
@@ -66,7 +66,11 @@ jobs:
   publish:
     needs: test
     # A push, tag, or PR never publishes. A maintainer must explicitly opt in.
-    if: github.event_name == 'workflow_dispatch' && inputs.publish && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    name: Publish multi-architecture image to GHCR
+    if: >-
+      github.repository == 'mkay1375/hopdns' &&
+      github.event_name == 'workflow_dispatch' && inputs.publish &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:

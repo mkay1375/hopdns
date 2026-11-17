@@ -10,6 +10,28 @@ to relay, and point your device's DNS at that machine.
 The screenshots use synthetic traffic in an isolated local lab, not a connected
 Xbox or PlayStation. [Dark view](docs/dark.png) · [Mobile view](docs/mobile.png).
 
+## Run the published image
+
+Download the Compose file, pull the image from GitHub Container Registry, and
+start HopDNS:
+
+```sh
+mkdir hopdns
+cd hopdns
+curl -fsSLO https://raw.githubusercontent.com/mkay1375/hopdns/main/compose.yaml
+docker compose pull
+docker compose up -d
+```
+
+To pull the image directly:
+
+```sh
+docker pull ghcr.io/mkay1375/hopdns:latest
+```
+
+Open **http://localhost:48741** to configure routing. For console or server
+access, see [Laptop, LAN, and server deployment](#laptop-lan-and-server-deployment).
+
 ## Run from source
 
 Build HopDNS from source with Docker Desktop (macOS/Windows/Linux) or Docker
@@ -219,26 +241,13 @@ HOPDNS_BIND=127.0.0.1 HOPDNS_PORT=48741 HOPDNS_RUNTIME=/tmp/hopdns-preview pytho
 Do not save routing settings in this preview unless you have installed the pinned
 engine. The panel can still display initial setup and unavailable metrics.
 
-## Release preparation
-
-No repository, release, or image is published by running the local commands.
-`compose.yaml` is prepared for `ghcr.io/mkay1375/hopdns:latest`; that reference
-becomes usable only after publication. Keep the build override until then.
-If publishing under another account, update that default and the source label.
+## Image releases
 
 CI runs unit, Compose, protocol, and browser checks on pushes and pull requests.
-**Publishing requires a manually dispatched workflow with `publish=true`** on
-main or a `v*` tag. Pushes, tags, and pull requests alone do not publish. After
-verification, the workflow builds AMD64 and ARM64 images and signs in to GHCR
-using the repository's automatic `GITHUB_TOKEN`. No registry secrets are needed
-in source. Make the package public separately when intending a public release.
-
-After an image has been published, a standalone folder needs only `compose.yaml`:
-
-```sh
-docker compose pull
-docker compose up -d
-```
+Maintainers can publish Linux AMD64 and ARM64 images to GHCR by running the
+workflow with `publish=true`. Dispatch it on `main` to update `latest`, or on
+a `v*` tag to publish a versioned image. The publish job runs after verification
+and signs in with the repository's `GITHUB_TOKEN`.
 
 Use `HOPDNS_IMAGE` in `.env` to pin a real released tag or digest. An update
 (`pull`, then `up -d`) can recreate the container and close active connections.
