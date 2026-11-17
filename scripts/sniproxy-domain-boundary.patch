@@ -1,0 +1,38 @@
+--- a/pkg/acl/domain.go	2026-11-17 03:47:55
++++ b/pkg/acl/domain.go	2026-11-17 03:47:55
+@@ -53,16 +53,33 @@
+ 	// check for prefix match
+ 	if longestPrefix := d.routePrefixes.GetLongestPrefix(fqdnLower); longestPrefix != nil {
+ 		// check if the longest prefix is present in the type hashtable as a prefix
+-		if d.routeFQDNs[longestPrefix.(string)] == matchPrefix {
++		candidate := longestPrefix.(string)
++		if d.routeFQDNs[candidate] == matchPrefix && strings.HasPrefix(fqdnLower, candidate) {
+ 			return false
+ 		}
++		// collections/tst can report a terminal node before matching its last
++		// byte. Do not trust that candidate, and do not let it hide a shorter
++		// valid rule. Hostnames bound this fallback to at most 253 bytes.
++		for end := 1; end <= len(fqdnLower); end++ {
++			if d.routeFQDNs[fqdnLower[:end]] == matchPrefix {
++				return false
++			}
++		}
+ 	}
+ 	// check for suffix match. Note that suffix is just prefix reversed
+ 	if longestSuffix := d.routeSuffixes.GetLongestPrefix(reverse(fqdnLower)); longestSuffix != nil {
+ 		// check if the longest suffix is present in the type hashtable as a suffix
+-		if d.routeFQDNs[longestSuffix.(string)] == matchSuffix {
++		candidate := longestSuffix.(string)
++		if d.routeFQDNs[candidate] == matchSuffix && strings.HasSuffix(fqdnLower, candidate) {
+ 			return false
+ 		}
++		// Preserve a shorter valid suffix when the trie returns a longer
++		// false candidate. The common successful path above remains unchanged.
++		for start := 0; start < len(fqdnLower); start++ {
++			if d.routeFQDNs[fqdnLower[start:]] == matchSuffix {
++				return false
++			}
++		}
+ 	}
+ 	return true
+ }
