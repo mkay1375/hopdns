@@ -12,11 +12,11 @@ Xbox or PlayStation. [Dark view](docs/dark.png) · [Mobile view](docs/mobile.png
 
 ## Run from source
 
-**HopDNS has not been published yet.** Build locally with Docker Desktop
-(macOS/Windows/Linux) or Docker Engine with Compose on Linux:
+Build HopDNS from source with Docker Desktop (macOS/Windows/Linux) or Docker
+Engine with Compose on Linux:
 
 ```sh
-git clone <your-hopdns-repository-url> hopdns
+git clone https://github.com/mkay1375/hopdns.git
 cd hopdns
 docker compose -f compose.yaml -f compose.build.yaml up --build -d
 ```
@@ -89,6 +89,13 @@ set `HOPDNS_TRAFFIC_BIND` to the laptop's LAN IPv4 and advertise that same LAN I
 in the panel. Allow only your trusted LAN clients through the host firewall.
 Keep the laptop awake and reachable. The console's custom DNS field takes that
 IPv4; it still needs the standard ports 53, 80, and 443 on HopDNS.
+
+On Docker Desktop for Mac, publishing those ports on a LAN address may require
+**Settings → Advanced → Allow privileged port forwarding to external machines**.
+Enable it, apply the change, and rerun the Compose startup command. Docker treats
+ports below 1024 as privileged, so a “Cannot bind privileged port” error can
+appear even when the port is free. The web panel still binds to localhost.
+[Docker Desktop port permissions](https://docs.docker.com/desktop/setup/install/mac-permission-requirements/#binding-privileged-ports)
 
 On a server, **first restrict inbound UDP/TCP 53 and TCP 80/443 to your client
 public IPs** using your cloud/provider firewall. Then set
