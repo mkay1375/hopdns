@@ -78,7 +78,7 @@ func trusted(r *http.Request) bool {
 	} else if strings.Contains(host, ":") {
 		return false
 	}
-	if name != "localhost" && name != "127.0.0.1" && name != "::1" {
+	if !IsPanelHost(name) {
 		return false
 	}
 	if r.Header.Get("Sec-Fetch-Site") == "cross-site" {
@@ -91,6 +91,11 @@ func trusted(r *http.Request) bool {
 		}
 	}
 	return r.Method == http.MethodGet || r.Header.Get("X-HopDNS-Request") == "1"
+}
+
+// IsPanelHost matches the hostnames the native panel can bind to and serve.
+func IsPanelHost(host string) bool {
+	return host == "localhost" || host == "127.0.0.1" || host == "::1"
 }
 
 func (c *Controller) saveHTTP(w http.ResponseWriter, r *http.Request) {

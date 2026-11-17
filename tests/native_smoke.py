@@ -159,7 +159,7 @@ class Application:
     def start(self):
         self.url = None
         self.stream = self.log.open('wb', buffering=0)
-        self.process = subprocess.Popen([str(self.binary), '--panel', '127.0.0.1:0', '--no-browser', '--data-dir', str(self.directory / 'settings'), '--dns-port', str(self.ports[0]), '--http-port', str(self.ports[1]), '--https-port', str(self.ports[2])], cwd=self.directory, stdout=self.stream, stderr=self.stream, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0)
+        self.process = subprocess.Popen([str(self.binary), '--panel', 'localhost:0', '--no-browser', '--data-dir', str(self.directory / 'settings'), '--dns-port', str(self.ports[0]), '--http-port', str(self.ports[1]), '--https-port', str(self.ports[2])], cwd=self.directory, stdout=self.stream, stderr=self.stream, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0)
         try:
             wait_until(lambda: self.discover_url(), 'terminal panel URL', 20)
             wait_until(lambda: self.api('/healthz'), 'panel readiness', 20)

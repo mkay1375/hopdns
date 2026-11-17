@@ -67,17 +67,9 @@ func run(args []string) error {
 		fmt.Printf("HopDNS %s (%s), %s/%s\n", version, commit, runtime.GOOS, runtime.GOARCH)
 		return nil
 	}
-	host, port, err := net.SplitHostPort(*panel)
+	panelAddress, err := panelBindAddress(*panel)
 	if err != nil {
-		return errors.New("panel must use a loopback address and port, for example 127.0.0.1:48741")
-	}
-	ip := net.ParseIP(host)
-	if host != "localhost" && (ip == nil || !ip.IsLoopback()) {
-		return errors.New("panel must bind to localhost, 127.0.0.1 or ::1")
-	}
-	number, err := strconv.Atoi(port)
-	if err != nil || number < 0 || number > 65535 {
-		return errors.New("invalid panel port")
+		return err
 	}
 	absoluteData, err := filepath.Abs(*dataDir)
 	if err != nil {
@@ -87,7 +79,7 @@ func run(args []string) error {
 	if err = options.Validate(); err != nil {
 		return err
 	}
-	listener, err := net.Listen("tcp", *panel)
+	listener, err := net.Listen("tcp", panelAddress)
 	if err != nil {
 		return fmt.Errorf("open browser panel: %w; choose a different --panel port", err)
 	}
@@ -124,6 +116,25 @@ func run(args []string) error {
 	shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	return server.Shutdown(shutdown)
+}
+
+func panelBindAddress(address string) (string, error) {
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return "", errors.New("panel must use a loopback address and port, for example 127.0.0.1:48741")
+	}
+	if !control.IsPanelHost(host) {
+		return "", errors.New("panel must bind to localhost, 127.0.0.1 or ::1")
+	}
+	number, err := strconv.Atoi(port)
+	if err != nil || number < 0 || number > 65535 {
+		return "", errors.New("invalid panel port")
+	}
+	if host == "localhost" {
+		// Avoid a resolver-dependent bind and keep the printed URL on loopback.
+		host = "127.0.0.1"
+	}
+	return net.JoinHostPort(host, strconv.Itoa(number)), nil
 }
 
 func openBrowser(url string) error {
