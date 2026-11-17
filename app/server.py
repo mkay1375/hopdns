@@ -12,6 +12,7 @@ import signal
 import socket
 import subprocess
 import threading
+import tempfile
 import time
 from collections import deque
 from datetime import datetime, timezone
@@ -183,6 +184,7 @@ class Controller:
         self.lock = threading.RLock()
         self.stop_event = threading.Event()
         self.process = None
+        self.engine_temp = None
         self.started_at = None
         self.last_start = 0
         self.generation = 0
@@ -208,6 +210,9 @@ class Controller:
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.wait(timeout=2)
+        if self.engine_temp:
+            self.engine_temp.cleanup()
+            self.engine_temp = None
         self.started_at = None
         self.sample = {}
         self.history.clear()
@@ -219,19 +224,26 @@ class Controller:
         if not self.config['public_ipv4']:
             self.state = 'setup_required'
             return
-        atomic_write(self.runtime / 'domains.csv', domain_csv(self.config['domains']))
-        atomic_write(self.runtime / 'engine.json', json.dumps(engine_config(self.config, self.runtime)))
-        # Ignore unvalidated upstream environment overrides; all configuration comes from us.
-        env = {k: v for k, v in os.environ.items() if not k.startswith('SNIPROXY_')}
-        env['NO_COLOR'] = 'true'
         try:
+            atomic_write(self.runtime / 'domains.csv', domain_csv(self.config['domains']))
+            atomic_write(self.runtime / 'engine.json', json.dumps(engine_config(self.config, self.runtime)))
+            # Ignore unvalidated upstream overrides; all configuration comes from us.
+            env = {k: v for k, v in os.environ.items() if not k.startswith('SNIPROXY_')}
+            env['NO_COLOR'] = 'true'
+            if self.engine_temp:
+                self.engine_temp.cleanup()
+            self.engine_temp = tempfile.TemporaryDirectory(prefix='engine-', dir=self.runtime)
+            env['TMPDIR'] = self.engine_temp.name
             self.process = subprocess.Popen([self.binary, '--config', str(self.runtime / 'engine.json')],
                                             stdin=subprocess.DEVNULL, env=env)
             self.started_at = time.monotonic()
             self.state = 'starting'
         except OSError:
+            if self.engine_temp:
+                self.engine_temp.cleanup()
+                self.engine_temp = None
             self.state = 'error'
-            self.error = 'Proxy engine could not start. Check the installed binary and container logs.'
+            self.error = 'Proxy engine could not start. Check the installed binary, runtime permissions, and container logs.'
 
     def apply(self, value):
         config = validate_config(value)
