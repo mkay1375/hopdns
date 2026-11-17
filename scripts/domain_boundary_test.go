@@ -1,6 +1,10 @@
 package acl
 
 import (
+	"github.com/knadh/koanf"
+	"github.com/rs/zerolog"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -52,4 +56,38 @@ func TestHopDNSDomainBoundaries(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Readiness must include the initial ACL, not merely scheduling a loader.
+func TestHopDNSDomainStartup(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "domains.csv")
+	log := zerolog.Nop()
+	configuration := koanf.New(".")
+	_ = configuration.Set("acl.domain.path", path)
+	_ = configuration.Set("acl.domain.refresh_interval", "1h")
+	_ = configuration.Set("acl.domain.priority", 20)
+	t.Run("missing list prevents startup", func(t *testing.T) {
+		d := &domain{}
+		if err := d.ConfigAndStart(&log, configuration); err == nil {
+			d.Stop()
+			t.Fatal("missing domain file must prevent startup")
+		}
+	})
+	if err := os.WriteFile(path, []byte("selected.hopdns.test.,fqdn\n.selected.hopdns.test.,suffix\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Run("selected rules available immediately", func(t *testing.T) {
+		d := &domain{}
+		if err := d.ConfigAndStart(&log, configuration); err != nil {
+			t.Fatal(err)
+		}
+		defer d.Stop()
+		if d.inDomainList("selected.hopdns.test") || d.inDomainList("cdn.selected.hopdns.test") {
+			t.Fatal("selected domains must be ready before ConfigAndStart returns")
+		}
+		if !d.inDomainList("other.hopdns.test") {
+			t.Fatal("unlisted domain must remain direct")
+		}
+	})
 }
