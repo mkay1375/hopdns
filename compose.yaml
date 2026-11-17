@@ -1,0 +1,35 @@
+services:
+  hopdns:
+    image: ${HOPDNS_IMAGE:-ghcr.io/mkay1375/hopdns:latest}
+    init: true
+    environment:
+      HOPDNS_PUBLIC_IPV4: ${HOPDNS_PUBLIC_IPV4:-}
+    volumes:
+      - hopdns-data:/data
+    ports:
+      - "127.0.0.1:${HOPDNS_PANEL_PORT:-48741}:8787"
+      - "${HOPDNS_TRAFFIC_BIND:-127.0.0.1}:${HOPDNS_DNS_PORT:-53}:53/udp"
+      - "${HOPDNS_TRAFFIC_BIND:-127.0.0.1}:${HOPDNS_DNS_PORT:-53}:53/tcp"
+      - "${HOPDNS_TRAFFIC_BIND:-127.0.0.1}:${HOPDNS_HTTP_PORT:-80}:80"
+      - "${HOPDNS_TRAFFIC_BIND:-127.0.0.1}:${HOPDNS_HTTPS_PORT:-443}:443"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: "0"
+    tmpfs:
+      - /run/hopdns:rw,nosuid,nodev,noexec,uid=10001,gid=10001,mode=700,size=16m
+      - /tmp:rw,nosuid,nodev,noexec,mode=1777,size=16m
+    restart: unless-stopped
+    stop_grace_period: 15s
+    pids_limit: 128
+    mem_limit: 256m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  hopdns-data:

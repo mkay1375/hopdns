@@ -1,0 +1,4 @@
+services:
+  hopdns:
+    build: .
+    image: hopdns:local
