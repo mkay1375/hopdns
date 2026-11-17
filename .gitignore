@@ -6,3 +6,7 @@ __pycache__/
 data/
 .DS_Store
 .idea/
+
+/dist/
+/hopdns
+/hopdns.exe

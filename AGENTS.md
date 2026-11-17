@@ -2,6 +2,27 @@
 
 ## Structure and commands
 
+- `cmd/hopdns/`: native terminal application entry point and browser launcher.
+- `internal/control/`: Go API, self-executable engine supervision and portable sampled monitoring.
+- `internal/engine/` and `third_party/sniproxy/`: embedded pinned upstream engine and reviewed corrections.
+- `web/embed.go`: embeds the browser panel in native builds.
+- `.github/workflows/native.yaml`: six native OS/architecture test and artifact builds.
+- `tests/native_smoke.py`: standalone executable API/DNS/lifecycle and local HTTP/TLS protocol lab.
+
+For native changes, run `go test ./...`, then build with
+`go build -trimpath -o hopdns ./cmd/hopdns`. Run the actual binary with
+`python3 tests/native_smoke.py --binary ./hopdns`. The upstream corrections are
+also tested with `go test ./pkg ./pkg/acl -run TestHopDNS` from
+`third_party/sniproxy`. The native test needs only Python's standard library and
+uses synthetic local origins. Its generated engine configuration alone permits
+private origins. Production parent configuration must refuse private origins.
+
+Native builds must remain self-contained. Keep the browser assets embedded and
+launch the same executable as the engine child. Preserve loopback panel/default
+traffic bindings, bounded monitoring, and graceful child cleanup. Native network
+statistics describe host interfaces rather than container-only bandwidth.
+
+
 - `app/server.py`: standard-library Python API, supervised upstream engine, sampled monitoring.
 - `web/`: directly served HTML, CSS, and vanilla JavaScript; no build or CDN dependency.
 - `tests/test_backend.py`: backend validation, API security, lifecycle and monitoring tests.

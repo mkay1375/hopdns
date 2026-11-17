@@ -29,3 +29,17 @@ libraries retain their respective licenses.
 The Python base image retains operating-system notices under
 `/usr/share/doc/*/copyright` and Python's license under its installed Python
 library directory. Image builds and publications do not relicense these components.
+
+## Native application
+
+The native executable embeds the same pinned and patched upstream source under
+`third_party/sniproxy`, together with HopDNS's Go control API and browser assets.
+It invokes its own executable as an engine child process. The source adapter skips
+unused encrypted-DNS certificate generation during ordinary proxy startup.
+
+Portable host monitoring uses `github.com/shirou/gopsutil/v4` and its dependencies,
+including platform support libraries such as `purego`, `go-ole`, `wmi`, and
+`perfstat`. Their license notices are retained with the other Go dependency
+notices. The exact native dependency versions are in the root `go.mod` and
+`go.sum`. Native archives retain these notices and the Go toolchain's BSD license
+alongside the executable. The notices are not runtime requirements.
