@@ -244,10 +244,11 @@ engine. The panel can still display initial setup and unavailable metrics.
 ## Image releases
 
 CI runs unit, Compose, protocol, and browser checks on pushes and pull requests.
-Maintainers can publish Linux AMD64 and ARM64 images to GHCR by running the
-workflow with `publish=true`. Dispatch it on `main` to update `latest`, or on
-a `v*` tag to publish a versioned image. The publish job runs after verification
-and signs in with the repository's `GITHUB_TOKEN`.
+After those checks pass on a push to `main`, GitHub Actions publishes the AMD64
+and ARM64 images to GHCR and updates `latest`. Maintainers can also dispatch the
+workflow with `publish=true` on `main` to update `latest`, or on a `v*` tag to
+publish a versioned image. The publish job signs in with the repository's
+`GITHUB_TOKEN`.
 
 Use `HOPDNS_IMAGE` in `.env` to pin a real released tag or digest. An update
 (`pull`, then `up -d`) can recreate the container and close active connections.

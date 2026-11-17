@@ -7,8 +7,8 @@
 - `tests/test_backend.py`: backend validation, API security, lifecycle and monitoring tests.
 - `tests/integration_smoke.py` and `tests/lab_origin.py`: real image against offline synthetic DNS/HTTP/TLS peers.
 - `tests/ui_smoke.cjs`: Playwright UI/theme smoke; mocked API values are synthetic.
-- `compose.yaml`: standalone, future published-image deployment. `compose.build.yaml`: local build override.
-- `docs/`: screenshots and third-party notices. `.github/workflows/ci.yaml`: verification and explicit manual publishing.
+- `compose.yaml`: standalone deployment using the published image. `compose.build.yaml`: local build override.
+- `docs/`: screenshots and third-party notices. `.github/workflows/ci.yaml`: verification and GHCR publishing.
 
 Run `python3 -m unittest discover -s tests -v` for backend changes. Build with
 `docker compose -f compose.yaml -f compose.build.yaml build`, then run
@@ -34,9 +34,11 @@ socket or use privileged mode. Never commit runtime data or credentials. Keep
 "all domains" wording accurate: HTTP/HTTPS through DNS, not all IP/UDP traffic.
 
 Preserve upstream/dependency licenses when updating the pinned executable.
-Keep documentation, source revision metadata, and patch in sync. CI pushes and
-pull requests must never publish; registry publishing requires manual opt-in and
-passing checks. Use `GITHUB_TOKEN`, never committed registry credentials.
+Keep documentation, source revision metadata, and patch in sync. Publish only
+after checks pass in the canonical repository. Pushes to `main` publish
+automatically. Version tags require manual dispatch with
+`publish=true`. Pull requests must never publish. Use `GITHUB_TOKEN`, never
+committed registry credentials.
 
 ## Workflow and review
 

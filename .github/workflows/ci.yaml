@@ -1,4 +1,4 @@
-name: Verify and optionally publish
+name: Verify and publish
 
 on:
   push:
@@ -65,12 +65,13 @@ jobs:
 
   publish:
     needs: test
-    # A push, tag, or PR never publishes. A maintainer must explicitly opt in.
+    # Publish tested main pushes or an explicit release from main or a version tag.
     name: Publish multi-architecture image to GHCR
     if: >-
       github.repository == 'mkay1375/hopdns' &&
-      github.event_name == 'workflow_dispatch' && inputs.publish &&
-      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+      ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+       (github.event_name == 'workflow_dispatch' && inputs.publish &&
+        (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))))
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
