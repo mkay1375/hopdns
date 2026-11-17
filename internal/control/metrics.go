@@ -135,7 +135,14 @@ func (c *Controller) collect() {
 			sample[k] = v
 		}
 		sample["active_connections"] = inboundConnections(ctx, pid, c.options)
-		ready = !needsReadiness || listenersReady(ctx, c.options)
+		ready = !needsReadiness
+		if needsReadiness {
+			// Optional OS telemetry may use its entire deadline. Startup readiness
+			// gets a fresh bounded context so slow statistics cannot block it.
+			probeContext, probeCancel := context.WithTimeout(context.Background(), time.Second)
+			ready = listenersReady(probeContext, c.options)
+			probeCancel()
+		}
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
