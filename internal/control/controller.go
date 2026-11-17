@@ -111,6 +111,9 @@ func New(o Options) (*Controller, error) {
 	if err != nil {
 		return nil, fmt.Errorf("saved settings: %w", err)
 	}
+	// Initialize before exposing the controller to API callers. Otherwise an
+	// immediate Save could start a child before the worker starts another one.
+	c.startEngine()
 	go c.run()
 	return c, nil
 }
@@ -232,9 +235,6 @@ func (c *Controller) stopEngine() {
 
 func (c *Controller) run() {
 	defer close(c.stopped)
-	c.mu.Lock()
-	c.startEngine()
-	c.mu.Unlock()
 	ticker := time.NewTicker(sampleInterval)
 	defer ticker.Stop()
 	for {
