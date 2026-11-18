@@ -1,15 +1,16 @@
 import copy
 import http.client
+import io
 import json
 from pathlib import Path
 import tempfile
 import threading
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from app.server import (Controller, DEFAULT_CONFIG, Server, active_connections,
-                        atomic_write, domain_csv, engine_config, network_bytes,
-                        parse_metrics, validate_config)
+                        atomic_write, domain_csv, engine_config, parse_metrics,
+                        validate_config)
 
 
 def config():
@@ -100,8 +101,13 @@ sniproxy_192_0_2_1_dns_requests_proxied_count 7
 sniproxy_192_0_2_1_http_requests_proxied 3
 sniproxy_192_0_2_1_https_requests_proxied 4
 sniproxy_192_0_2_1_https_requests_received NaN
+sniproxy_192_0_2_1_relay_bytes_to_client 9007199254740993
+sniproxy_192_0_2_1_relay_bytes_to_origin_total 3.0e2
+sniproxy_host_bytes_to_client 500000000
 ''')
-        self.assertEqual(result, {'dns_requests': 25, 'dns_proxied': 7, 'proxied_connections': 7})
+        self.assertEqual(result, {'dns_requests': 25, 'dns_proxied': 7, 'http_proxied': 3,
+                                 'https_proxied': 4, 'proxied_connections': 7,
+                                 'rx_bytes': 9007199254740993, 'tx_bytes': 300})
 
     def test_proc_only_counts_incoming_established_proxy_connections(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -109,21 +115,39 @@ sniproxy_192_0_2_1_https_requests_received NaN
             path.write_text('header\n0: 00000000:0050 00000000:C000 01\n1: 00000000:01BB 00000000:C001 01\n2: 00000000:1F90 00000000:C002 01\n3: 00000000:0050 00000000:C003 0A\n')
             self.assertEqual(active_connections([path]), 2)
             self.assertIsNone(active_connections([path.with_name('missing')]))
-            path.write_text('eth0: 100 0 0 0 0 0 0 0 200 0 0 0 0 0 0 0\nlo: 900 0 0 0 0 0 0 0 900 0 0 0 0 0 0 0\n')
-            self.assertEqual(network_bytes(path), (100, 200))
 
-    def test_history_bounded_and_bandwidth_reset(self):
+    def test_history_bounded_when_relay_has_not_started(self):
         with tempfile.TemporaryDirectory() as directory:
             controller = Controller(data=directory)
-            with patch('app.server.OPENER.open', side_effect=OSError), patch('app.server.network_bytes', return_value=(10, 20)), patch('app.server.active_connections', return_value=0):
-                controller.last_network = (0, 100, 200)
+            with patch('app.server.OPENER.open') as scrape:
                 for _ in range(125):
                     controller.sample_once()
+                scrape.assert_not_called()
             status = controller.status()
             self.assertEqual(len(status['history']), 120)
-            self.assertEqual(status['rx_bytes_per_second'], 0)
+            self.assertIsNone(status['rx_bytes'])
+            self.assertIsNone(status['rx_bytes_per_second'])
             self.assertIsNone(status['dns_requests'])
             self.assertEqual(status['state'], 'setup_required')
+
+    def test_relay_rates_track_only_successive_counter_samples(self):
+        def counters(rx, tx):
+            return io.BytesIO(f'sniproxy_relay_bytes_to_client {rx}\nsniproxy_relay_bytes_to_origin {tx}\n'.encode())
+
+        with tempfile.TemporaryDirectory() as directory:
+            controller = Controller(data=directory)
+            controller.process = Mock()
+            controller.process.poll.return_value = None
+            responses = [counters(0, 0), counters(200, 40), counters(0, 0), OSError, counters(500, 200)]
+            with (patch('app.server.OPENER.open', side_effect=responses),
+                  patch('app.server.time.monotonic', side_effect=[0, 5, 10, 15, 20]),
+                  patch('app.server.active_connections', return_value=0)):
+                for expected in [(0, 0, None, None), (200, 40, 40, 8), (0, 0, None, None),
+                                 (None, None, None, None), (500, 200, None, None)]:
+                    controller.sample_once()
+                    self.assertEqual(tuple(controller.sample.get(key) for key in
+                                           ('rx_bytes', 'tx_bytes', 'rx_bytes_per_second', 'tx_bytes_per_second')),
+                                     expected)
 
 
 class HTTPTests(unittest.TestCase):

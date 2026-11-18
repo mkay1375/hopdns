@@ -219,8 +219,19 @@ func TestHTTPBoundariesAndAssets(t *testing.T) {
 }
 
 func TestMetricsAndHistory(t *testing.T) {
-	metrics := parseMetrics("sniproxy_1_dns_requests_received 12\nsniproxy_1_http_requests_proxied 2\nsniproxy_1_https_requests_proxied 4\nsniproxy_1_https_requests_received NaN\n")
-	if metrics["dns_requests"] != int64(12) || metrics["proxied_connections"] != int64(6) || metrics["https_connections"] != nil {
+	metrics := parseMetrics(`sniproxy_1_dns_requests_received 12
+sniproxy_1_http_requests_proxied 2
+sniproxy_1_https_requests_proxied 4
+sniproxy_1_https_requests_received NaN
+sniproxy_1_relay_bytes_to_client 9007199254740993
+sniproxy_1_relay_bytes_to_origin_total 3.0e2
+sniproxy_host_bytes_to_client 500000000
+`)
+	want := map[string]any{
+		"dns_requests": int64(12), "http_proxied": int64(2), "https_proxied": int64(4),
+		"proxied_connections": int64(6), "rx_bytes": int64(9007199254740993), "tx_bytes": int64(300),
+	}
+	if !reflect.DeepEqual(metrics, want) {
 		t.Fatalf("bad metrics: %#v", metrics)
 	}
 	o := testOptions(t)
@@ -230,6 +241,30 @@ func TestMetricsAndHistory(t *testing.T) {
 	}
 	if len(c.Status()["history"].([]map[string]any)) != 120 {
 		t.Fatal("history grew beyond bound")
+	}
+	if c.Status()["rx_bytes"] != nil {
+		t.Fatal("transfer shown without a running relay")
+	}
+}
+
+func TestRelayRatesTrackOnlySuccessiveCounterSamples(t *testing.T) {
+	c := &Controller{}
+	start := time.Now()
+	for i, tt := range []struct {
+		rx, tx, rxRate, txRate any
+	}{
+		{int64(0), int64(0), nil, nil},
+		{int64(200), int64(40), float64(40), float64(8)},
+		{int64(0), int64(0), nil, nil},
+		{nil, nil, nil, nil},
+		{int64(500), int64(200), nil, nil},
+	} {
+		sample := map[string]any{"rx_bytes": tt.rx, "tx_bytes": tt.tx}
+		c.updateRelayRates(sample, start.Add(time.Duration(5*i)*time.Second))
+		if sample["rx_bytes_per_second"] != tt.rxRate || sample["tx_bytes_per_second"] != tt.txRate {
+			t.Fatalf("sample %d: got receive and transmit rates %v, %v, want %v, %v", i,
+				sample["rx_bytes_per_second"], sample["tx_bytes_per_second"], tt.rxRate, tt.txRate)
+		}
 	}
 }
 

@@ -5,7 +5,6 @@ import (
 	"context"
 	"io"
 	"math"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,16 +13,21 @@ import (
 	hostnet "github.com/shirou/gopsutil/v4/net"
 )
 
-type networkSample struct {
+type relaySample struct {
 	at     time.Time
-	rx, tx uint64
+	rx, tx int64
 }
 
 var metricsClient = &http.Client{Timeout: time.Second, Transport: &http.Transport{Proxy: nil, DisableKeepAlives: true}}
 
 func parseMetrics(body string) map[string]any {
 	out := map[string]any{}
-	names := map[string]string{"dns_requests_received": "dns_requests", "dns_requests_proxied": "dns_proxied", "http_requests_received": "http_requests", "https_requests_received": "https_connections", "http_requests_proxied": "http_proxied", "https_requests_proxied": "https_proxied"}
+	names := map[string]string{
+		"dns_requests_received": "dns_requests", "dns_requests_proxied": "dns_proxied",
+		"http_requests_received": "http_requests", "https_requests_received": "https_connections",
+		"http_requests_proxied": "http_proxied", "https_requests_proxied": "https_proxied",
+		"relay_bytes_to_client": "rx_bytes", "relay_bytes_to_origin": "tx_bytes",
+	}
 	scanner := bufio.NewScanner(strings.NewReader(body))
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -35,13 +39,17 @@ func parseMetrics(body string) map[string]any {
 			continue
 		}
 		key := strings.SplitN(fields[0], "{", 2)[0]
+		key = strings.TrimSuffix(strings.TrimSuffix(key, "_count"), "_total")
 		for suffix, target := range names {
-			if strings.HasSuffix(key, "_"+suffix) || strings.HasSuffix(key, "_"+suffix+"_count") {
-				v, err := strconv.ParseFloat(fields[1], 64)
-				if err == nil && !math.IsNaN(v) && !math.IsInf(v, 0) && v >= 0 && v <= math.MaxInt64 {
-					out[target] = int64(v)
-				}
+			if key != suffix && !strings.HasSuffix(key, "_"+suffix) {
+				continue
 			}
+			if value, err := strconv.ParseInt(fields[1], 10, 64); err == nil && value >= 0 {
+				out[target] = value
+			} else if value, err := strconv.ParseFloat(fields[1], 64); err == nil && value >= 0 && value < float64(math.MaxInt64) && math.Trunc(value) == value {
+				out[target] = int64(value)
+			}
+			break
 		}
 	}
 	a, aok := out["http_proxied"].(int64)
@@ -49,8 +57,6 @@ func parseMetrics(body string) map[string]any {
 	if aok && bok {
 		out["proxied_connections"] = a + b
 	}
-	delete(out, "http_proxied")
-	delete(out, "https_proxied")
 	return out
 }
 
@@ -70,29 +76,20 @@ func scrape(address string) map[string]any {
 	return parseMetrics(string(body))
 }
 
-func hostBytes(ctx context.Context) *networkSample {
-	interfaces, err := net.Interfaces()
-	if err != nil {
-		return nil
+func (c *Controller) updateRelayRates(sample map[string]any, now time.Time) {
+	previous := c.lastRelay
+	c.lastRelay = nil
+	rx, rxOK := sample["rx_bytes"].(int64)
+	tx, txOK := sample["tx_bytes"].(int64)
+	if !rxOK || !txOK {
+		return
 	}
-	excluded := map[string]bool{}
-	for _, iface := range interfaces {
-		if iface.Flags&net.FlagLoopback != 0 {
-			excluded[iface.Name] = true
-		}
+	c.lastRelay = &relaySample{at: now, rx: rx, tx: tx}
+	if previous != nil && now.After(previous.at) && rx >= previous.rx && tx >= previous.tx {
+		seconds := now.Sub(previous.at).Seconds()
+		sample["rx_bytes_per_second"] = float64(rx-previous.rx) / seconds
+		sample["tx_bytes_per_second"] = float64(tx-previous.tx) / seconds
 	}
-	stats, err := hostnet.IOCountersWithContext(ctx, true)
-	if err != nil || len(stats) == 0 {
-		return nil
-	}
-	result := &networkSample{at: time.Now()}
-	for _, stat := range stats {
-		if !excluded[stat.Name] {
-			result.rx += stat.BytesRecv
-			result.tx += stat.BytesSent
-		}
-	}
-	return result
 }
 
 func inboundConnections(ctx context.Context, pid int, o Options) any {
@@ -119,22 +116,19 @@ func (c *Controller) collect() {
 		pid = c.process.cmd.Process.Pid
 	}
 	c.mu.Unlock()
-	sample := map[string]any{"sampled_at": time.Now().UTC().Format(time.RFC3339Nano), "rx_bytes_per_second": nil, "tx_bytes_per_second": nil}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	bytes := hostBytes(ctx)
-	if bytes != nil {
-		sample["rx_bytes"] = bytes.rx
-		sample["tx_bytes"] = bytes.tx
-	}
+	sample := map[string]any{"rx_bytes_per_second": nil, "tx_bytes_per_second": nil}
 	metrics := map[string]any{}
 	ready := false
+	sampledAt := time.Now()
 	if pid != 0 {
 		metrics = scrape(metricsAddress)
+		sampledAt = time.Now()
 		for k, v := range metrics {
 			sample[k] = v
 		}
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		sample["active_connections"] = inboundConnections(ctx, pid, c.options)
+		cancel()
 		ready = !needsReadiness
 		if needsReadiness {
 			// Optional OS telemetry may use its entire deadline. Startup readiness
@@ -144,19 +138,13 @@ func (c *Controller) collect() {
 			probeCancel()
 		}
 	}
+	sample["sampled_at"] = sampledAt.UTC().Format(time.RFC3339Nano)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if generation != c.generation {
 		return
 	}
-	if bytes != nil && c.lastNetwork != nil {
-		seconds := bytes.at.Sub(c.lastNetwork.at).Seconds()
-		if seconds > 0 && bytes.rx >= c.lastNetwork.rx && bytes.tx >= c.lastNetwork.tx {
-			sample["rx_bytes_per_second"] = float64(bytes.rx-c.lastNetwork.rx) / seconds
-			sample["tx_bytes_per_second"] = float64(bytes.tx-c.lastNetwork.tx) / seconds
-		}
-	}
-	c.lastNetwork = bytes
+	c.updateRelayRates(sample, sampledAt)
 	c.sample = sample
 	point := map[string]any{"at": sample["sampled_at"], "rx_bytes_per_second": sample["rx_bytes_per_second"], "tx_bytes_per_second": sample["tx_bytes_per_second"], "active_connections": sample["active_connections"]}
 	c.history = append(c.history, point)

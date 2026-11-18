@@ -76,7 +76,7 @@ type Controller struct {
 	generation           uint64
 	sample               map[string]any
 	history              []map[string]any
-	lastNetwork          *networkSample
+	lastRelay            *relaySample
 	closeOnce            sync.Once
 	stop                 chan struct{}
 	stopped              chan struct{}
@@ -243,7 +243,7 @@ func (c *Controller) stopEngine() {
 	c.started = time.Time{}
 	c.sample = map[string]any{}
 	c.history = []map[string]any{}
-	c.lastNetwork = nil
+	c.lastRelay = nil
 	if c.runtimeDir != "" {
 		_ = os.RemoveAll(c.runtimeDir)
 		c.runtimeDir = ""
@@ -282,7 +282,7 @@ func (c *Controller) Close() { c.closeOnce.Do(func() { close(c.stop) }); <-c.sto
 func (c *Controller) Status() map[string]any {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	out := map[string]any{"active_connections": nil, "dns_requests": nil, "dns_proxied": nil, "http_requests": nil, "https_connections": nil, "proxied_connections": nil, "rx_bytes": nil, "tx_bytes": nil, "rx_bytes_per_second": nil, "tx_bytes_per_second": nil}
+	out := map[string]any{"active_connections": nil, "dns_requests": nil, "dns_proxied": nil, "http_requests": nil, "https_connections": nil, "http_proxied": nil, "https_proxied": nil, "proxied_connections": nil, "rx_bytes": nil, "tx_bytes": nil, "rx_bytes_per_second": nil, "tx_bytes_per_second": nil}
 	for k, v := range c.sample {
 		out[k] = v
 	}
@@ -300,7 +300,7 @@ func (c *Controller) Status() map[string]any {
 	out["mode"] = c.config.Mode
 	out["history"] = append([]map[string]any{}, c.history...)
 	out["sample_interval_seconds"] = int(sampleInterval.Seconds())
-	out["bandwidth_scope"] = "Host network (includes other applications and all non-loopback interfaces)"
+	out["bandwidth_scope"] = "HTTP bodies and HTTPS tunnel bytes forwarded by HopDNS"
 	out["upstream_commit"] = UpstreamCommit
 	return out
 }

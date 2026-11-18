@@ -4,7 +4,6 @@ from __future__ import annotations
 import copy
 import ipaddress
 import json
-import math
 import os
 from pathlib import Path
 import re
@@ -127,39 +126,33 @@ def parse_metrics(body):
     result = {}
     names = {'dns_requests_received': 'dns_requests', 'dns_requests_proxied': 'dns_proxied',
              'http_requests_received': 'http_requests', 'https_requests_received': 'https_connections',
-             'http_requests_proxied': 'http_proxied', 'https_requests_proxied': 'https_proxied'}
+             'http_requests_proxied': 'http_proxied', 'https_requests_proxied': 'https_proxied',
+             'relay_bytes_to_client': 'rx_bytes', 'relay_bytes_to_origin': 'tx_bytes'}
     for line in body.splitlines():
         if not line or line.startswith('#'):
             continue
         fields = line.split()
         if len(fields) != 2:
             continue
-        key = fields[0].split('{', 1)[0]
+        key = fields[0].split('{', 1)[0].removesuffix('_count').removesuffix('_total')
         for suffix, target in names.items():
-            if key.endswith('_' + suffix) or key.endswith('_' + suffix + '_count'):
+            if key != suffix and not key.endswith('_' + suffix):
+                continue
+            try:
+                number = int(fields[1])
+            except ValueError:
                 try:
                     number = float(fields[1])
-                    if math.isfinite(number) and number >= 0:
-                        result[target] = int(number)
+                    if not number.is_integer():
+                        break
                 except ValueError:
-                    pass
+                    break
+            if 0 <= number < 2**63:
+                result[target] = int(number)
+            break
     if 'http_proxied' in result and 'https_proxied' in result:
-        result['proxied_connections'] = result.pop('http_proxied') + result.pop('https_proxied')
+        result['proxied_connections'] = result['http_proxied'] + result['https_proxied']
     return result
-
-
-def network_bytes(path='/proc/net/dev'):
-    try:
-        for line in Path(path).read_text().splitlines():
-            if ':' not in line:
-                continue
-            name, data = line.split(':', 1)
-            if name.strip() == 'eth0':
-                values = data.split()
-                return int(values[0]), int(values[8])
-    except (OSError, ValueError, IndexError):
-        pass
-    return None, None
 
 
 def active_connections(paths=('/proc/net/tcp', '/proc/net/tcp6')):
@@ -196,7 +189,7 @@ class Controller:
         self.state = 'setup_required'
         self.error = None
         self.history = deque(maxlen=120)
-        self.last_network = None
+        self.last_relay = None
         self.sample = {}
         self.config = copy.deepcopy(DEFAULT_CONFIG)
         if (self.data / 'config.json').exists():
@@ -221,7 +214,7 @@ class Controller:
         self.started_at = None
         self.sample = {}
         self.history.clear()
-        self.last_network = None
+        self.last_relay = None
 
     def _start_engine(self):
         self.last_start = time.monotonic()
@@ -268,14 +261,14 @@ class Controller:
     def status(self):
         with self.lock:
             result = {key: None for key in ('active_connections', 'dns_requests', 'dns_proxied',
-                      'http_requests', 'https_connections', 'proxied_connections', 'rx_bytes',
-                      'tx_bytes', 'rx_bytes_per_second', 'tx_bytes_per_second')}
+                      'http_requests', 'https_connections', 'http_proxied', 'https_proxied',
+                      'proxied_connections', 'rx_bytes', 'tx_bytes', 'rx_bytes_per_second', 'tx_bytes_per_second')}
             result.update(self.sample)
             result.update(state=self.state, engine_running=self.process is not None and self.process.poll() is None,
                           error=self.error, uptime_seconds=int(time.monotonic() - self.started_at) if self.started_at else 0,
                           domain_count=len(self.config['domains']), mode=self.config['mode'],
                           history=list(self.history), sample_interval_seconds=INTERVAL,
-                          bandwidth_scope='Container network (includes DNS and panel traffic)',
+                          bandwidth_scope='HTTP bodies and HTTPS tunnel bytes forwarded by HopDNS',
                           upstream_commit=UPSTREAM_COMMIT)
             return result
 
@@ -283,28 +276,31 @@ class Controller:
         # Bounded scrape outside the controller lock, so HTTP API reads stay fast.
         with self.lock:
             generation = self.generation
-        try:
-            with OPENER.open('http://127.0.0.1:9090/metrics', timeout=1) as response:
-                body = response.read(262145)
-                if len(body) > 262144:
-                    raise ValueError('Metrics response too large')
-                metrics = parse_metrics(body.decode('utf-8'))
-        except (OSError, URLError, ValueError):
-            metrics = {}
-        rx, tx = network_bytes()
+            running = self.process is not None and self.process.poll() is None
+        metrics = {}
+        if running:
+            try:
+                with OPENER.open('http://127.0.0.1:9090/metrics', timeout=1) as response:
+                    body = response.read(262145)
+                    if len(body) > 262144:
+                        raise ValueError('Metrics response too large')
+                    metrics = parse_metrics(body.decode('utf-8'))
+            except (OSError, URLError, ValueError):
+                pass
         now = time.monotonic()
-        sample = dict(metrics, sampled_at=timestamp(), active_connections=active_connections(),
-                      rx_bytes=rx, tx_bytes=tx, rx_bytes_per_second=None, tx_bytes_per_second=None)
+        sample = dict(metrics, sampled_at=timestamp(), active_connections=active_connections() if running else None,
+                      rx_bytes_per_second=None, tx_bytes_per_second=None)
         with self.lock:
             if generation != self.generation:
                 return
-            if self.last_network and rx is not None and tx is not None:
-                previous_time, previous_rx, previous_tx = self.last_network
+            rx, tx = metrics.get('rx_bytes'), metrics.get('tx_bytes')
+            if self.last_relay and rx is not None and tx is not None:
+                previous_time, previous_rx, previous_tx = self.last_relay
                 elapsed = now - previous_time
-                if elapsed > 0:
-                    sample['rx_bytes_per_second'] = max(0, rx - previous_rx) / elapsed
-                    sample['tx_bytes_per_second'] = max(0, tx - previous_tx) / elapsed
-            self.last_network = (now, rx, tx) if rx is not None and tx is not None else None
+                if elapsed > 0 and rx >= previous_rx and tx >= previous_tx:
+                    sample['rx_bytes_per_second'] = (rx - previous_rx) / elapsed
+                    sample['tx_bytes_per_second'] = (tx - previous_tx) / elapsed
+            self.last_relay = (now, rx, tx) if rx is not None and tx is not None else None
             if self.process and self.process.poll() is None:
                 if metrics:
                     self.state = 'running'
@@ -322,9 +318,7 @@ class Controller:
         while not self.stop_event.is_set():
             with self.lock:
                 if self.process and self.process.poll() is not None:
-                    self.process = None
-                    self.started_at = None
-                    self.sample = {}
+                    self._stop_engine()
                     self.state = 'error'
                     self.error = 'Proxy engine exited. Retrying in 15 seconds; check container logs.'
                 if self.config['public_ipv4'] and self.process is None and time.monotonic() - self.last_start >= 15:
