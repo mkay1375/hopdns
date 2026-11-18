@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Set up HopDNS on your computer and connect your console.">
+  <title>HopDNS setup guide</title>
+  <link rel="stylesheet" href="guide.css">
+</head>
+<body>
+  <header>
+    <strong>HopDNS</strong>
+    <a href="fa/" lang="fa" hreflang="fa" dir="rtl">راهنمای فارسی</a>
+  </header>
+  <main>
+    <section class="intro">
+      <div>
+        <h1>Connect your console with HopDNS</h1>
+        <p>HopDNS lets supported web connections from your console go through a computer on your home network. It runs on Windows, macOS, and Linux and opens its settings in your browser.</p>
+        <a class="download" href="https://github.com/mkay1375/hopdns/actions/workflows/native.yaml?query=branch%3Amain+event%3Apush+is%3Asuccess">Download HopDNS</a>
+        <p>Sign in to GitHub, open the latest successful build, then pick the archive for your computer under <strong>Artifacts</strong>. Apple Silicon Macs use <code>darwin-arm64</code>. Most Windows PCs use <code>windows-amd64</code>.</p>
+      </div>
+      <figure>
+        <a href="desktop.png"><img src="desktop.png" alt="HopDNS browser panel showing connection counts and a traffic chart"></a>
+        <figcaption>HopDNS browser panel with sample traffic</figcaption>
+      </figure>
+    </section>
+    <section class="instructions">
+      <h2>Set up your console</h2>
+      <ol>
+        <li><strong>Connect both devices to your home network.</strong> Find your computer’s local IPv4 address in its network settings. It often starts with <code>192.168.</code></li>
+        <li><strong>Extract the download and start HopDNS.</strong> Open Terminal in the extracted folder. On Mac or Linux, run <code>./hopdns --traffic-bind 192.168.1.20 --public-ip 192.168.1.20</code>. In Windows PowerShell, use <code>.\hopdns.exe</code> in place of <code>./hopdns</code>. Replace both example addresses with your own.</li>
+        <li><strong>Open the panel.</strong> If the browser does not open, visit <a href="http://localhost:48741">localhost:48741</a> on your computer. Keep HopDNS running. If it reports a permissions or port error, see the <a href="https://github.com/mkay1375/hopdns/blob/main/docs/reference.md#native-application">native setup reference</a>.</li>
+        <li><strong>Set your console’s DNS manually.</strong> Use the same IPv4 address as primary DNS and run the console’s network test. To undo the change, set DNS back to <strong>Automatic</strong>.</li>
+      </ol>
+    </section>
+    <p class="note">HopDNS handles compatible web connections. Online gameplay that uses UDP follows the console’s normal network route.</p>
+  </main>
+  <footer><a href="https://github.com/mkay1375/hopdns">HopDNS on GitHub</a><a href="fa/" lang="fa" hreflang="fa" dir="rtl">فارسی</a></footer>
+</body>
+</html>

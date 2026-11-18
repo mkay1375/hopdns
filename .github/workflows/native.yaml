@@ -3,7 +3,9 @@ name: Build and test native applications
 on:
   push:
     branches: [main, native-single-binary]
+    paths-ignore: ['docs/**', '**/*.md', '**/*.mdx', '**/*.rst', '**/*.adoc']
   pull_request:
+    paths-ignore: ['docs/**', '**/*.md', '**/*.mdx', '**/*.rst', '**/*.adoc']
   workflow_dispatch:
 
 permissions:

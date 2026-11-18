@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="راهنمای سادهٔ راه‌اندازی HopDNS روی رایانه و اتصال کنسول">
+  <title>راهنمای راه‌اندازی HopDNS</title>
+  <link rel="stylesheet" href="../guide.css">
+</head>
+<body>
+  <header>
+    <strong dir="ltr">HopDNS</strong>
+    <a href="../" lang="en" hreflang="en" dir="ltr">English guide</a>
+  </header>
+  <main>
+    <section class="intro">
+      <div>
+        <h1>کنسولتان را با <bdi>HopDNS</bdi> وصل کنید</h1>
+        <p>با <bdi>HopDNS</bdi> می‌توانید اتصال‌های وبِ سازگارِ کنسول را از رایانه‌تان در شبکهٔ خانگی عبور دهید. برنامه روی ویندوز، مک و لینوکس اجرا می‌شود و تنظیماتش در مرورگر باز می‌شود.</p>
+        <a class="download" href="https://github.com/mkay1375/hopdns/actions/workflows/native.yaml?query=branch%3Amain+event%3Apush+is%3Asuccess">دانلود <bdi>HopDNS</bdi></a>
+        <p>وارد گیت‌هاب شوید، آخرین اجرای موفق را باز کنید و در بخش <bdi><strong>Artifacts</strong></bdi> فایل متناسب با دستگاهتان را بگیرید. برای مک با تراشهٔ اپل، <code>darwin-arm64</code> و برای بیشتر رایانه‌های ویندوزی، <code>windows-amd64</code> را بگیرید.</p>
+      </div>
+      <figure>
+        <a href="../desktop.png"><img src="../desktop.png" alt="پنل HopDNS در مرورگر، همراه با تعداد اتصال‌ها و نمودار ترافیک"></a>
+        <figcaption>پنل <bdi>HopDNS</bdi> با ترافیک نمونه</figcaption>
+      </figure>
+    </section>
+    <section class="instructions">
+      <h2>راه‌اندازی روی کنسول</h2>
+      <ol>
+        <li><strong>هر دو دستگاه را به شبکهٔ خانگی وصل کنید.</strong> در تنظیمات شبکهٔ رایانه، نشانی محلی <bdi>IPv4</bdi> را پیدا کنید. این نشانی اغلب با <code>192.168.</code> شروع می‌شود.</li>
+        <li><strong>فایل دانلودشده را از حالت فشرده خارج کنید و برنامه را اجرا کنید.</strong> ترمینال را در همان پوشه باز کنید. در مک یا لینوکس، <code>./hopdns --traffic-bind 192.168.1.20 --public-ip 192.168.1.20</code> را اجرا کنید. در پاورشل ویندوز، به‌جای <code>./hopdns</code> از <code>.\hopdns.exe</code> استفاده کنید. در هر دو جای فرمان، نشانی رایانهٔ خودتان را وارد کنید.</li>
+        <li><strong>پنل را باز کنید.</strong> اگر مرورگر خودکار باز نشد، در همان رایانه به <a href="http://localhost:48741" dir="ltr">localhost:48741</a> بروید. برنامه را باز نگه دارید. اگر با خطای دسترسی یا پورت روبه‌رو شدید، <a href="https://github.com/mkay1375/hopdns/blob/main/docs/reference.md#native-application">راهنمای کامل راه‌اندازی</a> را ببینید.</li>
+        <li><strong><bdi>DNS</bdi> کنسول را دستی تنظیم کنید.</strong> همان نشانی <bdi>IPv4</bdi> را به‌عنوان <bdi>DNS</bdi> اصلی وارد کنید و آزمون اتصال کنسول را اجرا کنید. برای بازگشت به تنظیمات قبلی، حالت <bdi><strong>Automatic</strong></bdi> را انتخاب کنید.</li>
+      </ol>
+    </section>
+    <p class="note"><bdi>HopDNS</bdi> اتصال‌های وبِ سازگار را عبور می‌دهد. بازی‌های آنلاین که از <bdi>UDP</bdi> استفاده می‌کنند همچنان از مسیر عادی شبکهٔ کنسول می‌گذرند.</p>
+  </main>
+  <footer><a href="https://github.com/mkay1375/hopdns">مخزن <bdi>HopDNS</bdi> در گیت‌هاب</a><a href="../" lang="en" hreflang="en" dir="ltr">English</a></footer>
+</body>
+</html>

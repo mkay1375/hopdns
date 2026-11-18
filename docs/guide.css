@@ -1,0 +1,44 @@
+@font-face {
+  font-family: Vazirmatn;
+  src: url("fonts/vazirmatn-arabic.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-08FF, U+200C-200E, U+FB50-FDFF, U+FE70-FEFF;
+}
+:root {
+  color-scheme: light;
+  background: #f0f5fa;
+  color: #132941;
+  font-family: system-ui, sans-serif;
+  line-height: 1.65;
+  --accent: #234bb4;
+  --line: #cbd8e6;
+}
+:root[lang="fa"], a[lang="fa"] { font-family: Vazirmatn, system-ui, sans-serif; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+header, main, footer { width: min(70rem, calc(100% - 2.5rem)); margin-inline: auto; }
+header, footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .75rem; padding-block: 1rem; }
+header { border-block-end: 1px solid var(--line); }
+footer { border-block-start: 1px solid var(--line); margin-block-start: 2rem; padding-block: 1.5rem; }
+a { color: var(--accent); text-underline-offset: .18em; }
+a:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+p { max-inline-size: 62ch; }
+h1, h2 { line-height: 1.25; margin-block: 0 .6em; }
+h1 { font-size: clamp(2rem, 4.5vw, 3.65rem); }
+h2 { font-size: clamp(1.45rem, 3vw, 2rem); }
+.intro { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: clamp(1.5rem, 5vw, 4rem); padding-block: clamp(2rem, 6vw, 4rem); }
+figure { margin: 0; }
+figure img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; object-position: top; border: 1px solid var(--line); border-radius: .65rem; background: #fff; }
+figcaption { color: #445971; font-size: .9rem; margin-block-start: .5rem; }
+.download { display: inline-block; margin-block-start: .5rem; padding: .6rem 1rem; background: var(--accent); color: #fff; border-radius: .4rem; text-decoration: none; font-weight: 650; }
+.instructions { background: #fff; border: 1px solid var(--line); border-radius: .65rem; padding: clamp(1rem, 4vw, 2rem); }
+ol { margin-block-end: 0; padding-inline-start: 1.5rem; }
+li { max-inline-size: 74ch; padding-inline-start: .35rem; margin-block-end: .9rem; }
+li:last-child { margin-block-end: 0; }
+code { direction: ltr; unicode-bidi: isolate; overflow-wrap: anywhere; background: #e8eff7; padding: .08em .3em; border-radius: .2em; }
+.note { margin-block-start: 1.5rem; border-inline-start: .2rem solid var(--accent); padding-inline-start: 1rem; }
+@media (max-width: 740px) {
+  .intro { grid-template-columns: 1fr; }
+}
