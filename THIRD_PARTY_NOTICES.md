@@ -17,8 +17,8 @@ the filter during startup. Without it, a lookalike such as
 build runs the accompanying focused Go regression suite before compilation.
 `sniproxy-half-close.patch` propagates TCP half-closes after copying completes,
 so EOF-dependent clients finish and upload FIN does not discard the reverse
-response. These are routing and connection correctness patches; no per-request
-monitoring is added to the proxy.
+response. `sniproxy-relay-bytes.patch` adds cumulative directional counters for
+forwarded HTTP bodies and HTTPS tunnel bytes.
 The upstream Go module includes dependencies with their own licenses. Their
 notices are retained in `docs/licenses/go-dependencies/`; the dependency manifest
 is retained as `docs/licenses/sniproxy-go.mod` and `sniproxy-go.sum`.
@@ -37,7 +37,7 @@ The native executable embeds the same pinned and patched upstream source under
 It invokes its own executable as an engine child process. The source adapter skips
 unused encrypted-DNS certificate generation during ordinary proxy startup.
 
-Portable host monitoring uses `github.com/shirou/gopsutil/v4` and its dependencies,
+Portable TCP connection sampling uses `github.com/shirou/gopsutil/v4` and its dependencies,
 including platform support libraries such as `purego`, `go-ole`, `wmi`, and
 `perfstat`. Their license notices are retained with the other Go dependency
 notices. The exact native dependency versions are in the root `go.mod` and

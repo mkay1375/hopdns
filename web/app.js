@@ -47,8 +47,8 @@
   }
   function renderChart(history) {
     const now = Date.now();
-    const valid = history.filter(point => Number.isFinite(Date.parse(point.at)) && now - Date.parse(point.at) <= 300000 && (Number.isFinite(point.rx_bytes_per_second) || Number.isFinite(point.tx_bytes_per_second)));
-    $('chart-empty').hidden = valid.length > 1;
+    const valid = history.filter(point => Number.isFinite(Date.parse(point.at)) && now - Date.parse(point.at) <= 300000);
+    $('chart-empty').hidden = valid.filter(point => Number.isFinite(point.rx_bytes_per_second) || Number.isFinite(point.tx_bytes_per_second)).length > 1;
     const maximum = Math.max(1, ...valid.flatMap(p => [p.rx_bytes_per_second || 0, p.tx_bytes_per_second || 0]));
     $('chart-scale').textContent = bytes(maximum, true);
     const x = p => Math.min(800, Math.max(0, (Date.parse(p.at) - now + 300000) / 300000 * 800));

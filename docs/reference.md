@@ -277,7 +277,9 @@ per-domain request logs are added.
 | Relayed web data and traffic rates | HTTP body bytes and HTTPS tunnel bytes, including the forwarded TLS handshake. Each forwarded byte is counted once in its direction. |
 
 Counters and chart history reset when the relay restarts. Rates use the difference
-between two samples. Unavailable values display as a dash.
+between two samples. On Linux, a direct HTTPS tunnel reports each direction in
+chunks of up to 64 KiB, with remaining bytes reported when that direction closes.
+Unavailable values display as a dash.
 The lightweight collection still consumes some CPU and memory: zero overhead is
 not possible. Measure on the target machine before capacity planning. The
 256 MiB/128-process Compose limits are conservative starting points, not a
