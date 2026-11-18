@@ -46,7 +46,7 @@ func run(args []string) error {
 	}
 	flags := flag.NewFlagSet("hopdns", flag.ContinueOnError)
 	panel := flags.String("panel", "127.0.0.1:48741", "loopback address for the browser panel (port 0 chooses an available port)")
-	trafficBind := flags.String("traffic-bind", "127.0.0.1", "IPv4 interface for DNS and proxy listeners; use your LAN IPv4 for a console")
+	trafficBind := flags.String("traffic-bind", "0.0.0.0", "IPv4 interface for DNS and proxy listeners; use 127.0.0.1 for local-only access")
 	dnsPort := flags.Int("dns-port", 53, "DNS UDP and TCP port")
 	httpPort := flags.Int("http-port", 80, "HTTP relay port")
 	httpsPort := flags.Int("https-port", 443, "HTTPS relay port")
@@ -84,6 +84,9 @@ func run(args []string) error {
 		return fmt.Errorf("open browser panel: %w; choose a different --panel port", err)
 	}
 	defer listener.Close()
+	if *trafficBind == "0.0.0.0" && *publicIP == "" {
+		options.DetectedIPv4 = detectLANIPv4()
+	}
 	controller, err := control.New(options)
 	if err != nil {
 		return err
@@ -94,6 +97,9 @@ func run(args []string) error {
 	go func() { done <- server.Serve(listener) }()
 	url := "http://" + listener.Addr().String()
 	fmt.Printf("HopDNS %s\nPanel: %s\nSettings: %s\nDNS: %s:%d (UDP/TCP)\nHTTP: %s:%d\nHTTPS: %s:%d\n", version, url, absoluteData, *trafficBind, *dnsPort, *trafficBind, *httpPort, *trafficBind, *httpsPort)
+	if address := controller.Config().PublicIPv4; address != "" {
+		fmt.Printf("DNS address for your console: %s\n", address)
+	}
 	fmt.Println("Keep this terminal open. Press Ctrl+C to stop HopDNS.")
 	if *trafficBind != "127.0.0.1" {
 		fmt.Println("LAN/server listeners enabled. Restrict access to trusted clients with your host or provider firewall.")

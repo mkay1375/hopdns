@@ -26,22 +26,30 @@ On Windows, extract the ZIP and run `hopdns.exe` or launch it from PowerShell:
 .\hopdns.exe
 ```
 
-Open **http://localhost:48741** if the browser does not open. Enter the reachable
-IPv4 address and save routing to start the DNS and proxy listeners. Settings
-persist in the user configuration directory under `hopdns`, including after a
-restart. `--data-dir PATH` selects a different directory or lets you import an
-existing `config.json` with the same format as the Docker version.
+Open **http://localhost:48741** if the browser does not open. In current native
+builds, DNS and proxy listeners bind to `0.0.0.0` by default. When HopDNS finds a
+private LAN IPv4 address, it starts the relay and shows the DNS address to use
+under **Connect a device** and in the terminal. Automatic detection runs at
+startup. If your address changes, restart HopDNS and update the console's DNS.
+If the computer uses a VPN or multiple networks, check that the displayed
+address belongs to the network your console is on. You can enter the correct
+address in **Reachable IPv4 address** and click **Save routing**.
 
-To serve an Xbox on your LAN, use the computer's LAN IPv4 for both the listener
-and the address entered in the panel:
+Settings persist in the user configuration directory under `hopdns`. A manually
+saved address takes precedence over automatic detection. `--data-dir PATH`
+selects a different directory or imports an existing Docker `config.json`.
+
+For v0.1.0, or to bind only to a specific interface and set the initial
+advertised address:
 
 ```sh
 ./hopdns --traffic-bind 192.168.1.20 --public-ip 192.168.1.20
 ```
 
-Use your own LAN address. Allow trusted clients to reach UDP/TCP 53 and TCP
-80/443 through the host firewall. On Windows, allow the executable on the trusted
-network when Windows Firewall requests access. The panel stays on loopback.
+Use your own LAN address. Keep the DNS and proxy ports reachable only by trusted
+clients through the host firewall (UDP/TCP 53 and TCP 80/443). For loopback-only
+access, use `--traffic-bind 127.0.0.1`. On Windows, allow HopDNS on your private
+network when Windows Firewall asks. The panel stays on loopback.
 
 Ports 53, 80, and 443 can require elevated privileges on macOS and Linux. If the
 terminal reports a permission error, launch from an elevated terminal, or grant
@@ -49,7 +57,7 @@ only the low-port binding capability on Linux. Free any ports held by another
 DNS/proxy application before starting. For example, on macOS or Linux:
 
 ```sh
-sudo ./hopdns --no-browser --traffic-bind 192.168.1.20 --public-ip 192.168.1.20
+sudo ./hopdns --no-browser
 ```
 
 Then open the printed panel URL in your normal browser. On a Linux server,
@@ -59,7 +67,7 @@ an SSH local forward to `127.0.0.1:48741`.
 For a local preview using unprivileged ports:
 
 ```sh
-./hopdns --no-browser --panel 127.0.0.1:48742 --dns-port 1053 --http-port 1080 --https-port 1443
+./hopdns --no-browser --panel 127.0.0.1:48742 --traffic-bind 127.0.0.1 --public-ip 127.0.0.1 --dns-port 1053 --http-port 1080 --https-port 1443
 ```
 
 Custom ports support development and matching services. Consoles still expect

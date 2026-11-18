@@ -24,6 +24,7 @@ const sampleInterval = 5 * time.Second
 type Options struct {
 	DataDir                      string
 	PublicIPv4                   string
+	DetectedIPv4                 string
 	TrafficBind                  string
 	DNSPort, HTTPPort, HTTPSPort int
 	Executable                   string
@@ -67,6 +68,7 @@ type Controller struct {
 	mu                   sync.Mutex
 	options              Options
 	config               Config
+	automaticIPv4        bool
 	process              *child
 	runtimeDir, metrics  string
 	state, lastError     string
@@ -103,12 +105,21 @@ func New(o Options) (*Controller, error) {
 		}
 	} else if !os.IsNotExist(err) {
 		return nil, err
-	} else {
+	}
+	if c.config.PublicIPv4 == "" {
 		c.config.PublicIPv4 = o.PublicIPv4
 	}
 	c.config, err = Validate(c.config, true)
 	if err != nil {
 		return nil, fmt.Errorf("saved settings: %w", err)
+	}
+	if c.config.PublicIPv4 == "" && o.DetectedIPv4 != "" {
+		detected := c.config
+		detected.PublicIPv4 = o.DetectedIPv4
+		if detected, err = Validate(detected, false); err == nil {
+			c.config = detected
+			c.automaticIPv4 = true
+		}
 	}
 	// Initialize before exposing the controller to API callers. Otherwise an
 	// immediate Save could start a child before the worker starts another one.
@@ -137,7 +148,13 @@ func (c *Controller) Apply(value Config) (bool, error) {
 		return false, errors.New("service is stopping")
 	default:
 	}
-	body, _ := json.MarshalIndent(config, "", "  ")
+	stored := config
+	automaticIPv4 := c.automaticIPv4 && config.PublicIPv4 == c.config.PublicIPv4
+	if automaticIPv4 {
+		// Detect again on the next launch instead of saving a DHCP address.
+		stored.PublicIPv4 = ""
+	}
+	body, _ := json.MarshalIndent(stored, "", "  ")
 	// Persist even an unchanged env-initialized configuration when Save is pressed.
 	if err = atomicWrite(filepath.Join(c.options.DataDir, "config.json"), append(body, '\n')); err != nil {
 		return false, fmt.Errorf("save settings: %w", err)
@@ -147,6 +164,7 @@ func (c *Controller) Apply(value Config) (bool, error) {
 	}
 	c.stopEngine()
 	c.config = config
+	c.automaticIPv4 = automaticIPv4
 	c.startEngine()
 	return true, nil
 }

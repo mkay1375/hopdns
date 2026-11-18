@@ -24,6 +24,7 @@ import tempfile
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -60,11 +61,11 @@ def dns_question(name, kind=1):
     return struct.pack('!HHHHHH', 1234, 256, 1, 0, 0, 0) + b''.join(bytes([len(x)]) + x.encode() for x in name.split('.')) + b'\0' + struct.pack('!HH', kind, 1)
 
 
-def dns_query(port, name, tcp=False, kind=1):
+def dns_query(port, name, tcp=False, kind=1, host='127.0.0.1'):
     query = dns_question(name, kind)
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM if tcp else socket.SOCK_DGRAM) as sock:
         sock.settimeout(4)
-        sock.connect(('127.0.0.1', port))
+        sock.connect((host, port))
         if tcp:
             sock.sendall(struct.pack('!H', len(query)) + query)
             response = receive(sock, struct.unpack('!H', receive(sock, 2))[0])
@@ -150,8 +151,9 @@ def stop_process(process):
 
 
 class Application:
-    def __init__(self, binary, directory, ports):
+    def __init__(self, binary, directory, ports, traffic_bind='127.0.0.1'):
         self.binary, self.directory, self.ports = binary, directory, ports
+        self.traffic_bind = traffic_bind
         self.log = directory / 'terminal.log'
         self.process = None
         self.url = None
@@ -159,7 +161,10 @@ class Application:
     def start(self):
         self.url = None
         self.stream = self.log.open('wb', buffering=0)
-        self.process = subprocess.Popen([str(self.binary), '--panel', 'localhost:0', '--no-browser', '--data-dir', str(self.directory / 'settings'), '--dns-port', str(self.ports[0]), '--http-port', str(self.ports[1]), '--https-port', str(self.ports[2])], cwd=self.directory, stdout=self.stream, stderr=self.stream, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0)
+        args = [str(self.binary), '--panel', 'localhost:0', '--no-browser', '--data-dir', str(self.directory / 'settings'), '--dns-port', str(self.ports[0]), '--http-port', str(self.ports[1]), '--https-port', str(self.ports[2])]
+        if self.traffic_bind is not None:
+            args.extend(['--traffic-bind', self.traffic_bind])
+        self.process = subprocess.Popen(args, cwd=self.directory, stdout=self.stream, stderr=self.stream, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0)
         try:
             wait_until(lambda: self.discover_url(), 'terminal panel URL', 20)
             wait_until(lambda: self.api('/healthz'), 'panel readiness', 20)
@@ -245,6 +250,24 @@ def main():
             stack.enter_context(serving(server))
         ports = tuple(available_port() for _ in range(3))
         assert len(set(ports)) == 3
+        lan_directory = directory / 'lan'
+        lan_directory.mkdir()
+        lan = Application(binary, lan_directory, ports, traffic_bind=None)
+        stack.callback(lan.stop)
+        lan.start()
+        lan_config = lan.api('/api/config')
+        assert f'DNS: 0.0.0.0:{ports[0]}' in lan.log.read_text(errors='replace')
+        if address := lan_config['public_ipv4']:
+            wait_until(lambda: lan.api()['state'] == 'running', 'automatic LAN engine readiness')
+            assert dns_query(ports[0], 'xbox.com', host=address) == address
+            assert dns_query(ports[0], 'xboxlive.com', tcp=True, host=address) == address
+            assert dns_query(ports[0], 'playstation.net', host=address) == address
+            with socket.socket() as sock:
+                sock.settimeout(1)
+                assert sock.connect_ex((address, urllib.parse.urlparse(lan.url).port)) != 0, 'Panel accepted LAN connections'
+        else:
+            assert lan.api()['state'] == 'setup_required'
+        lan.stop()
         app = Application(binary, directory, ports)
         stack.callback(app.stop)
         app.start()

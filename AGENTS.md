@@ -18,8 +18,8 @@ uses synthetic local origins. Its generated engine configuration alone permits
 private origins. Production parent configuration must refuse private origins.
 
 Native builds must remain self-contained. Keep the browser assets embedded and
-launch the same executable as the engine child. Preserve loopback panel/default
-traffic bindings, bounded monitoring, and graceful child cleanup. Native network
+launch the same executable as the engine child. Preserve the loopback panel,
+native `0.0.0.0` traffic default, bounded monitoring, and graceful child cleanup. Native network
 statistics describe host interfaces rather than container-only bandwidth.
 
 

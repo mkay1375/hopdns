@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -111,6 +112,49 @@ func TestAtomicPersistenceAndInvalidApply(t *testing.T) {
 	defer reloaded.Close()
 	if reloaded.Config().PublicIPv4 != saved.PublicIPv4 {
 		t.Fatal("saved configuration did not reload")
+	}
+}
+
+func TestAutomaticIPv4OnRestart(t *testing.T) {
+	o := testOptions(t)
+	o.DetectedIPv4 = "192.168.1.20"
+	c, err := New(o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(c.Close)
+	cfg := c.Config()
+	if cfg.PublicIPv4 != o.DetectedIPv4 {
+		t.Fatalf("initial address = %q, want %q", cfg.PublicIPv4, o.DetectedIPv4)
+	}
+	cfg.Domains = []string{"example.com"}
+	if _, err := c.Apply(cfg); err != nil {
+		t.Fatal(err)
+	}
+	c.Close()
+	o.DetectedIPv4 = "192.168.1.21"
+	reloaded, err := New(o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(reloaded.Close)
+	cfg = reloaded.Config()
+	if cfg.PublicIPv4 != o.DetectedIPv4 || !reflect.DeepEqual(cfg.Domains, []string{"example.com"}) {
+		t.Fatalf("unexpected reloaded configuration: %+v", cfg)
+	}
+	cfg.PublicIPv4 = "192.0.2.10"
+	if _, err := reloaded.Apply(cfg); err != nil {
+		t.Fatal(err)
+	}
+	reloaded.Close()
+	o.DetectedIPv4 = "192.168.1.22"
+	manual, err := New(o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(manual.Close)
+	if got := manual.Config().PublicIPv4; got != cfg.PublicIPv4 {
+		t.Fatalf("saved manual address = %q, want %q", got, cfg.PublicIPv4)
 	}
 }
 
