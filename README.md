@@ -10,6 +10,98 @@ to relay, and point your device's DNS at that machine.
 The screenshots use synthetic traffic in an isolated local lab, not a connected
 Xbox or PlayStation. [Dark view](docs/dark.png) · [Mobile view](docs/mobile.png).
 
+## Native application
+
+The native version runs on macOS, Windows, and Linux as a single executable,
+with the DNS relay and browser panel bundled inside. End users need no Docker,
+Python, Go installation, or separate web files. Keep the terminal open while
+HopDNS runs. It opens the panel in your default browser and prints its URL.
+
+Download the artifact for your operating system and CPU from a successful
+[Native application workflow](https://github.com/mkay1375/hopdns/actions/workflows/native.yaml).
+Each archive contains one application executable, license notices, and a
+SHA-256 checksum. The notices are legal documentation and are not runtime assets.
+
+On macOS or Linux, extract the archive and run from Terminal:
+
+```sh
+./hopdns
+```
+
+On Windows, extract the ZIP and run `hopdns.exe` or launch it from PowerShell:
+
+```powershell
+.\hopdns.exe
+```
+
+Open **http://localhost:48741** if the browser does not open. Enter the reachable
+IPv4 address and save routing to start the DNS and proxy listeners. Settings
+persist in the user configuration directory under `hopdns`, including after a
+restart. `--data-dir PATH` selects a different directory or lets you import an
+existing `config.json` with the same format as the Docker version.
+
+To serve an Xbox on your LAN, use the computer's LAN IPv4 for both the listener
+and the address entered in the panel:
+
+```sh
+./hopdns --traffic-bind 192.168.1.20 --public-ip 192.168.1.20
+```
+
+Use your own LAN address. Allow trusted clients to reach UDP/TCP 53 and TCP
+80/443 through the host firewall. On Windows, allow the executable on the trusted
+network when Windows Firewall requests access. The panel stays on loopback.
+
+Ports 53, 80, and 443 can require elevated privileges on macOS and Linux. If the
+terminal reports a permission error, launch from an elevated terminal, or grant
+only the low-port binding capability on Linux. Free any ports held by another
+DNS/proxy application before starting. For example, on macOS or Linux:
+
+```sh
+sudo ./hopdns --no-browser --traffic-bind 192.168.1.20 --public-ip 192.168.1.20
+```
+
+Then open the printed panel URL in your normal browser. On a Linux server,
+`--no-browser` supports headless operation. A remote panel can be reached using
+an SSH local forward to `127.0.0.1:48741`.
+
+For a local preview using unprivileged ports:
+
+```sh
+./hopdns --no-browser --panel 127.0.0.1:48742 --dns-port 1053 --http-port 1080 --https-port 1443
+```
+
+Custom ports support development and matching services. Consoles still expect
+standard DNS and proxy ports. The HTTPS relay connects to the same destination
+port as its listening port, so a relay listening on 1443 targets origin port
+1443. Running a Docker instance at the same time requires distinct ports.
+
+The native downloads are unsigned. macOS Gatekeeper or Windows SmartScreen may
+require the usual approval for a downloaded executable. Launching from a terminal
+keeps error messages visible. Press **Ctrl+C** to stop the panel and its engine
+child process. The application executes its own file as that child, so both
+processes use the same single binary.
+
+Native bandwidth totals cover the host's non-loopback interfaces, including
+other applications. VPN interfaces can count the same transfer again. Active
+connections are sampled for the engine process and configured relay ports.
+Collection happens every five seconds outside forwarding, and unavailable OS
+statistics are shown as unavailable.
+
+To build from source with Go 1.26 or later:
+
+```sh
+go build -trimpath -o hopdns ./cmd/hopdns
+```
+
+On Windows, use `-o hopdns.exe`. Native CI runs Go tests and real executable
+DNS/HTTP/TLS checks on AMD64 and ARM64 runners for all three operating systems.
+It also checks the browser panel, themes, and mobile layout on Linux. Run the
+same executable smoke test locally with Python as a development-only dependency:
+
+```sh
+python3 tests/native_smoke.py --binary ./hopdns
+```
+
 ## Run the published image
 
 Download the Compose file, pull the image from GitHub Container Registry, and

@@ -1,0 +1,246 @@
+package acl
+
+import (
+	"bufio"
+	"fmt"
+	"net"
+	"net/http"
+	"os"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/golang-collections/collections/tst"
+	"github.com/knadh/koanf"
+	"github.com/rs/zerolog"
+)
+
+// domain ACL makes a decision on a connection based on the domain name derived
+// from client hello's SNI. It can be used to skip the sni proxy for certain domains
+type domain struct {
+	Path            string        `yaml:"domain.path"`
+	RefreshInterval time.Duration `yaml:"domain.refresh_interval"`
+	mu              sync.RWMutex
+	routePrefixes   *tst.TernarySearchTree
+	routeSuffixes   *tst.TernarySearchTree
+	routeFQDNs      map[string]uint8
+	logger          *zerolog.Logger
+	priority        uint
+	stopCh          chan struct{}
+	doneCh          chan struct{}
+}
+
+const (
+	matchPrefix = uint8(1)
+	matchSuffix = uint8(2)
+	matchFQDN   = uint8(3)
+)
+
+// inDomainList returns true if the domain is meant to be SKIPPED and not go through sni proxy
+func (d *domain) inDomainList(fqdn string) bool {
+	// Bound work on untrusted DNS/SNI input, including the fallback below.
+	if len(fqdn) > 254 {
+		return true
+	}
+	if !strings.HasSuffix(fqdn, ".") {
+		fqdn = fqdn + "."
+	}
+	if len(fqdn) > 254 {
+		return true
+	}
+	fqdnLower := strings.ToLower(fqdn)
+
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	// check for fqdn match
+	if d.routeFQDNs[fqdnLower] == matchFQDN {
+		return false
+	}
+	// check for prefix match
+	if longestPrefix := d.routePrefixes.GetLongestPrefix(fqdnLower); longestPrefix != nil {
+		// check if the longest prefix is present in the type hashtable as a prefix
+		candidate := longestPrefix.(string)
+		if d.routeFQDNs[candidate] == matchPrefix && strings.HasPrefix(fqdnLower, candidate) {
+			return false
+		}
+		// collections/tst can report a terminal node before matching its last
+		// byte. Do not trust that candidate, and do not let it hide a shorter
+		// valid rule. Hostnames bound this fallback to at most 253 bytes.
+		for end := 1; end <= len(fqdnLower); end++ {
+			if d.routeFQDNs[fqdnLower[:end]] == matchPrefix {
+				return false
+			}
+		}
+	}
+	// check for suffix match. Note that suffix is just prefix reversed
+	if longestSuffix := d.routeSuffixes.GetLongestPrefix(reverse(fqdnLower)); longestSuffix != nil {
+		// check if the longest suffix is present in the type hashtable as a suffix
+		candidate := longestSuffix.(string)
+		if d.routeFQDNs[candidate] == matchSuffix && strings.HasSuffix(fqdnLower, candidate) {
+			return false
+		}
+		// Preserve a shorter valid suffix when the trie returns a longer
+		// false candidate. The common successful path above remains unchanged.
+		for start := 0; start < len(fqdnLower); start++ {
+			if d.routeFQDNs[fqdnLower[start:]] == matchSuffix {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func reverse(s string) string {
+	r := []rune(s)
+	for i, j := 0, len(r)-1; i < len(r)/2; i, j = i+1, j-1 {
+		r[i], r[j] = r[j], r[i]
+	}
+	return string(r)
+}
+
+// LoadDomainsCsv loads a domains Csv file/URL.
+// It builds new data structures locally then atomically swaps them in under a write lock.
+func (d *domain) LoadDomainsCsv(Filename string) error {
+	d.logger.Info().Msg("Loading the domain from file/url")
+	var scanner *bufio.Scanner
+	if strings.HasPrefix(Filename, "http://") || strings.HasPrefix(Filename, "https://") {
+		d.logger.Info().Msg("domain list is a URL, trying to fetch")
+		client := http.Client{
+			Timeout: 30 * time.Second,
+			CheckRedirect: func(r *http.Request, _ []*http.Request) error {
+				r.URL.Opaque = r.URL.Path
+				return nil
+			},
+		}
+		resp, err := client.Get(Filename)
+		if err != nil {
+			d.logger.Error().Msg(err.Error())
+			return err
+		}
+		d.logger.Info().Msgf("(re)fetching URL: %s", Filename)
+		defer func() { _ = resp.Body.Close() }()
+		scanner = bufio.NewScanner(resp.Body)
+
+	} else {
+		file, err := os.Open(Filename) //nolint:gosec // G304 - file path comes from configuration
+		if err != nil {
+			return err
+		}
+		d.logger.Info().Msgf("(re)loading file: %s", Filename)
+		defer func() { _ = file.Close() }()
+		scanner = bufio.NewScanner(file)
+	}
+
+	// Build new data structures locally to avoid holding the lock during I/O
+	newPrefixes := tst.New()
+	newSuffixes := tst.New()
+	newFQDNs := make(map[string]uint8)
+
+	for scanner.Scan() {
+		lowerCaseLine := strings.ToLower(scanner.Text())
+		fqdn := strings.Split(lowerCaseLine, ",")
+		if len(fqdn) != 2 {
+			d.logger.Info().Msg(lowerCaseLine + " is not a valid line, assuming FQDN")
+			fqdn = []string{lowerCaseLine, "fqdn"}
+		}
+		switch entryType := fqdn[1]; entryType {
+		case "prefix":
+			newFQDNs[fqdn[0]] = matchPrefix
+			newPrefixes.Insert(fqdn[0], fqdn[0])
+		case "suffix":
+			newFQDNs[fqdn[0]] = matchSuffix
+			newSuffixes.Insert(reverse(fqdn[0]), fqdn[0])
+		case "fqdn":
+			newFQDNs[fqdn[0]] = matchFQDN
+		default:
+			d.logger.Info().Msg(lowerCaseLine + " is not a valid line, assuming FQDN")
+			newFQDNs[fqdn[0]] = matchFQDN
+		}
+	}
+
+	// Atomically swap under write lock
+	d.mu.Lock()
+	d.routePrefixes = newPrefixes
+	d.routeSuffixes = newSuffixes
+	d.routeFQDNs = newFQDNs
+	d.mu.Unlock()
+
+	d.logger.Info().Msgf("%s loaded with %d prefix, %d suffix and %d fqdn", Filename, newPrefixes.Len(), newSuffixes.Len(), len(newFQDNs)-newPrefixes.Len()-newSuffixes.Len())
+
+	return nil
+}
+
+func (d *domain) LoadDomainsCSVWorker(path string, interval time.Duration) {
+	defer close(d.doneCh)
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-d.stopCh:
+			return
+		case <-ticker.C:
+			if err := d.LoadDomainsCsv(path); err != nil {
+				d.logger.Warn().Err(err).Msg("failed to reload domain list")
+			}
+		}
+	}
+}
+
+// Decide implements the ACL interface
+func (d *domain) Decide(c *ConnInfo) error {
+	d.logger.Debug().Any("conn", c).Msg("deciding on domain acl")
+
+	if c.Decision == Reject {
+		c.DstIP = net.TCPAddr{IP: net.IPv4zero, Port: 0}
+		d.logger.Debug().Any("conn", c).Msg("decided on domain acl")
+		return nil
+	}
+	if d.inDomainList(c.Domain) {
+		d.logger.Debug().Msgf("domain not going through proxy: %s", c.Domain)
+		c.Decision = OriginIP
+	} else {
+		d.logger.Debug().Msgf("domain going through proxy: %s", c.Domain)
+		c.Decision = ProxyIP
+	}
+	d.logger.Debug().Any("conn", c).Msg("decided on domain acl")
+	return nil
+}
+func (d *domain) Name() string {
+	return "domain"
+}
+func (d *domain) Priority() uint {
+	return d.priority
+}
+
+func (d *domain) ConfigAndStart(logger *zerolog.Logger, c *koanf.Koanf) error {
+	c = c.Cut(fmt.Sprintf("acl.%s", d.Name()))
+	d.logger = logger
+	d.routePrefixes = tst.New()
+	d.routeSuffixes = tst.New()
+	d.routeFQDNs = make(map[string]uint8)
+	d.Path = c.String("path")
+	d.priority = uint(c.Int("priority")) //nolint:gosec // G115 - priority is a small non-negative config value
+	d.RefreshInterval = c.Duration("refresh_interval")
+	// Load before listeners can accept queries. An empty initial ACL would
+	// otherwise return origin addresses that clients can cache after startup.
+	if err := d.LoadDomainsCsv(d.Path); err != nil {
+		return fmt.Errorf("initial domain list load: %w", err)
+	}
+	d.stopCh = make(chan struct{})
+	d.doneCh = make(chan struct{})
+	go d.LoadDomainsCSVWorker(d.Path, d.RefreshInterval)
+	return nil
+}
+
+// Stop terminates the refresh worker and waits for it to exit, so the ACL can
+// be safely reconfigured afterwards
+func (d *domain) Stop() {
+	close(d.stopCh)
+	<-d.doneCh
+}
+
+// make domain available to the ACL system at import time
+func init() {
+	availableACLs = append(availableACLs, &domain{})
+}

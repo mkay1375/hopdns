@@ -1,0 +1,186 @@
+package acl
+
+import (
+	"bufio"
+	"fmt"
+	"net"
+	"net/http"
+	"os"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/knadh/koanf"
+	"github.com/rs/zerolog"
+	"github.com/yl2chen/cidranger"
+)
+
+// CIDR acl allows sniproxy to use a list of CIDR to allow or reject connections
+// The list is loaded from a file or URL and refreshed periodically
+// The list is a CSV file with the CIDR in the first column and the policy in the second
+// The policy can be allow or reject and defaults to reject
+type cidr struct {
+	Path            string        `yaml:"path"`
+	RefreshInterval time.Duration `yaml:"refresh_interval"`
+	mu              sync.RWMutex
+	AllowRanger     cidranger.Ranger
+	RejectRanger    cidranger.Ranger
+	logger          *zerolog.Logger
+	priority        uint
+	stopCh          chan struct{}
+	doneCh          chan struct{}
+}
+
+func (d *cidr) LoadCIDRCSV(path string) error {
+	// Build new rangers locally to avoid holding the lock during I/O
+	allowRanger := cidranger.NewPCTrieRanger()
+	rejectRanger := cidranger.NewPCTrieRanger()
+
+	d.logger.Info().Msg("Loading the CIDR from file/url")
+	var scanner *bufio.Scanner
+	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
+		d.logger.Info().Msg("CIDR list is a URL, trying to fetch")
+		client := http.Client{
+			Timeout: 30 * time.Second,
+			CheckRedirect: func(r *http.Request, _ []*http.Request) error {
+				r.URL.Opaque = r.URL.Path
+				return nil
+			},
+		}
+		resp, err := client.Get(path)
+		if err != nil {
+			d.logger.Error().Msg(err.Error())
+			return err
+		}
+		d.logger.Info().Msgf("(re)fetching URL: %s", path)
+		defer func() { _ = resp.Body.Close() }()
+		scanner = bufio.NewScanner(resp.Body)
+
+	} else {
+		file, err := os.Open(path) //nolint:gosec // G304 - file path comes from configuration
+		if err != nil {
+			return err
+		}
+		d.logger.Info().Msgf("(re)loading file: %s", path)
+		defer func() { _ = file.Close() }()
+		scanner = bufio.NewScanner(file)
+	}
+
+	for scanner.Scan() {
+		row := scanner.Text()
+		// cut the line at the first comma
+		cidrStr, policy, found := strings.Cut(row, ",")
+		if !found {
+			d.logger.Info().Msg(cidrStr + " is not a valid csv line, assuming reject")
+		}
+		if policy == "allow" {
+			if _, netw, err := net.ParseCIDR(cidrStr); err == nil {
+				_ = allowRanger.Insert(cidranger.NewBasicRangerEntry(*netw))
+			} else {
+				if _, netw, err := net.ParseCIDR(cidrStr + "/32"); err == nil {
+					_ = allowRanger.Insert(cidranger.NewBasicRangerEntry(*netw))
+				} else {
+					d.logger.Error().Msg(err.Error())
+				}
+			}
+		} else {
+			if _, netw, err := net.ParseCIDR(cidrStr); err == nil {
+				_ = rejectRanger.Insert(cidranger.NewBasicRangerEntry(*netw))
+			} else {
+				if _, netw, err := net.ParseCIDR(cidrStr + "/32"); err == nil {
+					_ = rejectRanger.Insert(cidranger.NewBasicRangerEntry(*netw))
+				} else {
+					d.logger.Error().Msg(err.Error())
+				}
+			}
+		}
+	}
+
+	// Atomically swap under write lock
+	d.mu.Lock()
+	d.AllowRanger = allowRanger
+	d.RejectRanger = rejectRanger
+	d.mu.Unlock()
+
+	d.logger.Info().Msgf("%d cidr(s) loaded", allowRanger.Len()+rejectRanger.Len())
+
+	return nil
+}
+
+func (d *cidr) loadCIDRCSVWorker(path string, interval time.Duration) {
+	defer close(d.doneCh)
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	// Initial load
+	_ = d.LoadCIDRCSV(path)
+	for {
+		select {
+		case <-d.stopCh:
+			return
+		case <-ticker.C:
+			_ = d.LoadCIDRCSV(path)
+		}
+	}
+}
+
+// Decide checks if the connection is allowed or rejected
+func (d *cidr) Decide(c *ConnInfo) error {
+	d.logger.Debug().Any("conn", c).Msg("deciding on cidr acl")
+
+	// Use net.SplitHostPort for correct IPv6 handling
+	host, _, err := net.SplitHostPort(c.SrcIP.String())
+	if err != nil {
+		return fmt.Errorf("failed to parse source IP %q: %w", c.SrcIP.String(), err)
+	}
+	ip := net.ParseIP(host)
+
+	prevDec := c.Decision
+	// set the prev decision to accept if it's empty
+	if prevDec == "" {
+		prevDec = Accept
+	}
+
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	if match, err := d.RejectRanger.Contains(ip); match && err == nil {
+		c.Decision = Reject
+	}
+	if match, err := d.AllowRanger.Contains(ip); match && err == nil {
+		c.Decision = prevDec
+	}
+	return nil
+}
+
+// Name function is used to cut the YAML config file to be passed on to the ACL for config
+func (d *cidr) Name() string {
+	return "cidr"
+}
+func (d *cidr) Priority() uint {
+	return d.priority
+}
+
+// ConfigAndStart starts the ACL
+func (d *cidr) ConfigAndStart(logger *zerolog.Logger, c *koanf.Koanf) error {
+	c = c.Cut(fmt.Sprintf("acl.%s", d.Name()))
+	d.logger = logger
+	d.Path = c.String("path")
+	d.priority = uint(c.Int("priority")) //nolint:gosec // G115 - priority is a small non-negative config value
+	d.RefreshInterval = c.Duration("refresh_interval")
+	d.stopCh = make(chan struct{})
+	d.doneCh = make(chan struct{})
+	go d.loadCIDRCSVWorker(d.Path, d.RefreshInterval)
+	return nil
+}
+
+// Stop terminates the refresh worker and waits for it to exit, so the ACL can
+// be safely reconfigured afterwards
+func (d *cidr) Stop() {
+	close(d.stopCh)
+	<-d.doneCh
+}
+
+// make the acl available at import time
+func init() {
+	availableACLs = append(availableACLs, &cidr{})
+}

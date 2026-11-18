@@ -1,0 +1,460 @@
+// sniproxy's main CLI entrypoint.
+package enginecli
+
+import (
+	"context"
+	"fmt"
+	"net"
+	"net/http"
+	nethttppprof "net/http/pprof"
+	"net/netip"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"strings"
+	"syscall"
+	"time"
+
+	prometheusmetrics "github.com/deathowl/go-metrics-prometheus"
+	"github.com/google/uuid"
+	"github.com/knadh/koanf"
+	"github.com/knadh/koanf/parsers/yaml"
+	"github.com/knadh/koanf/providers/env"
+	"github.com/knadh/koanf/providers/file"
+	"github.com/knadh/koanf/providers/rawbytes"
+	"github.com/pkg/profile"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/rcrowley/go-metrics"
+	"github.com/rs/zerolog"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/spf13/cobra"
+
+	_ "embed"
+	stdlog "log"
+
+	sniproxy "github.com/mosajjal/sniproxy/v2/pkg"
+	"github.com/mosajjal/sniproxy/v2/pkg/acl"
+	"github.com/mosajjal/sniproxy/v2/pkg/doh"
+)
+
+var c sniproxy.Config
+
+var (
+	version   = "v2.4.2-hopdns.1"
+	commit    = "1429d6dbe7bed4767597470223f93a407b0d5dab"
+	envPrefix = "SNIPROXY_" // used as the prefix to read env variables at runtime
+)
+
+//go:embed config.defaults.yaml
+var defaultConfig []byte
+
+// disable colors in logging if NO_COLOR is set
+var nocolorLog = strings.ToLower(os.Getenv("NO_COLOR")) == "true"
+var logger = zerolog.New(os.Stderr).With().Timestamp().Logger().Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339, NoColor: nocolorLog})
+
+// goroutineLeakProfiler writes a goroutineleak profile when sniproxy exits.
+// github.com/pkg/profile has no goroutineleak mode, so this reimplements the
+// same Stop() shape directly on top of runtime/pprof.
+type goroutineLeakProfiler struct{}
+
+func (g *goroutineLeakProfiler) Stop() {
+	// os.CreateTemp, not a fixed name in the shared temp directory. sniproxy
+	// normally runs as root to bind 80/443/53, and a predictable path is a
+	// target: os.Create follows symlinks, so a local user could plant one and
+	// have the daemon truncate a file of their choosing. This gives an
+	// unguessable name, O_EXCL, and mode 0600.
+	f, err := os.CreateTemp("", "sniproxy-goroutineleak-*.pprof")
+	if err != nil {
+		logger.Error().Err(err).Msg("failed to create goroutine leak profile file")
+		return
+	}
+	defer func() {
+		if err := f.Close(); err != nil {
+			logger.Error().Err(err).Msg("failed to close goroutine leak profile file")
+		}
+	}()
+
+	n, err := sniproxy.WriteGoroutineLeakProfile(f, 0)
+	if err != nil {
+		logger.Error().Err(err).Msg("failed to write goroutine leak profile")
+		return
+	}
+	logger.Info().Int("leaked", n).Msgf("goroutine leak profile written to %s", f.Name())
+}
+
+// isLoopbackAddr reports whether a "host:port" bind address is restricted to
+// the loopback interface. An empty host means every interface, and a name other
+// than localhost could resolve anywhere, so both count as not loopback.
+func isLoopbackAddr(bind string) bool {
+	host, _, err := net.SplitHostPort(bind)
+	if err != nil {
+		return false
+	}
+	if host == "localhost" {
+		return true
+	}
+	ip, err := netip.ParseAddr(host)
+	return err == nil && ip.IsLoopback()
+}
+
+// portList reads ports given as a YAML list or a comma-separated
+// string, e.g. [8080, "8081-8083"] or "8080,8081-8083".
+func portList(k *koanf.Koanf, key string) []string {
+	if ports := k.Strings(key); len(ports) > 0 {
+		return ports
+	}
+
+	ports := strings.Split(k.String(key), ",")
+	out := []string{}
+	for _, p := range ports {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		out = append(out, p)
+	}
+	return out
+}
+
+// publicIP returns the configured address, or detects it when empty.
+// A failed detection returns "" so single-stack hosts still start.
+func publicIP(configured string, detect func() (string, error), family string) string {
+	if configured != "" {
+		logger.Info().Msgf("public %s (manually provided): %s", family, configured)
+		return configured
+	}
+
+	ip, err := detect()
+	if err != nil {
+		logger.Warn().Msgf("failed to get public %s, disabling it: %s", family, err)
+		return ""
+	}
+	logger.Info().Msgf("public %s (automatically determined): %s", family, ip)
+	return ip
+}
+
+func enableProfile(profileType string) interface{ Stop() } {
+	switch profileType {
+	case "":
+		return nil
+	case "cpu":
+		return profile.Start(profile.CPUProfile)
+	case "mem":
+		return profile.Start(profile.MemProfile)
+	case "block":
+		return profile.Start(profile.BlockProfile)
+	case "mutex":
+		return profile.Start(profile.MutexProfile)
+	case "trace":
+		return profile.Start(profile.TraceProfile)
+	case "threadcreate":
+		return profile.Start(profile.ThreadcreationProfile)
+	case "goroutine":
+		return profile.Start(profile.GoroutineProfile)
+	case "goroutineleak":
+		// on shutdown, run leak detection and dump the stacks of every
+		// goroutine that can never become runnable again
+		return &goroutineLeakProfiler{}
+	case "clock":
+		return profile.Start(profile.ClockProfile)
+	default:
+		logger.Error().Msgf("unknown profile type: %s", profileType)
+	}
+	return nil
+}
+
+// Run starts the upstream command in a dedicated HopDNS engine child process.
+func Run(args []string) {
+
+	cmd := &cobra.Command{
+		Use:   "sniproxy",
+		Short: "SNI Proxy with Embedded DNS Server",
+		Run:   func(_ *cobra.Command, _ []string) {},
+	}
+	cmd.SetArgs(args)
+	flags := cmd.Flags()
+	config := flags.StringP("config", "c", "", "path to YAML configuration file")
+	_ = flags.Bool("defaultconfig", false, "write the default config yaml file to stdout")
+	prof := flags.String("prof", "", "enable profiling. can be one of: [cpu, mem, block, mutex, trace, threadcreate, goroutine, goroutineleak, clock]")
+	_ = flags.BoolP("version", "v", false, "show version info and exit")
+	if err := cmd.Execute(); err != nil {
+		logger.Error().Msgf("failed to execute command: %s", err)
+		return
+	}
+	if flags.Changed("help") {
+		return
+	}
+	if flags.Changed("version") {
+		fmt.Printf("sniproxy version %s, commit %s\n", version, commit)
+		return
+	}
+	if flags.Changed("defaultconfig") {
+		_, _ = fmt.Fprint(os.Stdout, string(defaultConfig))
+		return
+	}
+	ret := enableProfile(*prof)
+	if ret != nil {
+		defer ret.Stop()
+	}
+
+	k := koanf.New(".")
+	// load the defaults
+	if err := k.Load(rawbytes.Provider(defaultConfig), yaml.Parser()); err != nil {
+		panic(err)
+	}
+	if *config != "" {
+		if err := k.Load(file.Provider(*config), yaml.Parser()); err != nil {
+			panic(err)
+		}
+	}
+	// load environment variables starting with envPrefix
+	if err := k.Load(env.Provider(envPrefix, ".", func(s string) string {
+		return strings.ReplaceAll(strings.ToLower(
+			strings.TrimPrefix(s, envPrefix)), "__", ".")
+	}), nil); err != nil {
+		logger.Warn().Err(err).Msg("failed to load environment variables")
+	}
+
+	logger.Info().Msgf("starting sniproxy. version %s, commit %s", version, commit)
+
+	// verify and load config
+	generalConfig := k.Cut("general")
+
+	stdlog.SetFlags(0)
+	stdlog.SetOutput(logger)
+
+	switch l := generalConfig.String("log_level"); l {
+	case "debug":
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+		logger = logger.With().Caller().Logger()
+	case "info":
+		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+		logger = logger.With().Caller().Logger()
+	case "warn":
+		zerolog.SetGlobalLevel(zerolog.WarnLevel)
+	case "error":
+		zerolog.SetGlobalLevel(zerolog.ErrorLevel)
+	default:
+		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	}
+
+	c.UpstreamDNS = generalConfig.String("upstream_dns")
+	c.UpstreamDNSOverSocks5 = generalConfig.Bool("upstream_dns_over_socks5")
+	c.UpstreamSOCKS5 = generalConfig.String("upstream_socks5")
+	c.BindDNSOverUDP = generalConfig.String("bind_dns_over_udp")
+	c.BindDNSOverTCP = generalConfig.String("bind_dns_over_tcp")
+	c.BindDNSOverTLS = generalConfig.String("bind_dns_over_tls")
+	c.BindDNSOverQuic = generalConfig.String("bind_dns_over_quic")
+	c.TLSCert = generalConfig.String("tls_cert")
+	c.TLSKey = generalConfig.String("tls_key")
+	c.BindHTTP = generalConfig.String("bind_http")
+	c.BindHTTPAdditional = portList(generalConfig, "bind_http_additional")
+	c.BindHTTPS = generalConfig.String("bind_https")
+	c.BindHTTPSAdditional = portList(generalConfig, "bind_https_additional")
+	c.Interface = generalConfig.String("interface")
+	c.PreferredVersion = generalConfig.String("preferred_version")
+
+	// if preferred version is ipv6only, we don't need to check for ipv4 public ip
+	if c.PreferredVersion != "ipv6only" {
+		c.PublicIPv4 = publicIP(generalConfig.String("public_ipv4"), sniproxy.GetPublicIPv4, "IPv4")
+	}
+	// if preferred version is ipv4only, we don't need to check for ipv6 public ip
+	if c.PreferredVersion != "ipv4only" {
+		c.PublicIPv6 = publicIP(generalConfig.String("public_ipv6"), sniproxy.GetPublicIPv6, "IPv6")
+	}
+
+	// in any case, at least one public IP address is needed to run the server. if both are empty, we can't proceed
+	if c.PublicIPv4 == "" && c.PublicIPv6 == "" {
+		logger.Error().Msg("Could not automatically determine any public IP. you should provide it manually using --publicIPv4 or --publicIPv6 or both.")
+		logger.Error().Msg("if your environment is single-stack, you can use --preferredVersion to specify the version as ipv4only or ipv6only.")
+		return
+	}
+
+	c.BindPrometheus = generalConfig.String("prometheus")
+	c.BindPprof = generalConfig.String("bind_pprof")
+	c.GoroutineLeakInterval = generalConfig.Duration("goroutine_leak_interval")
+	c.AllowConnToLocal = generalConfig.Bool("allow_conn_to_local")
+
+	// Validate configuration before proceeding
+	if err := c.Validate(); err != nil {
+		logger.Fatal().Msgf("configuration validation failed: %s", err)
+	}
+
+	var err error
+	c.ACL, err = acl.StartACLs(&logger, k)
+	if err != nil {
+		logger.Error().Msgf("failed to start ACLs: %s", err)
+		return
+	}
+
+	// set up metrics
+	c.ReceivedDNS = metrics.GetOrRegisterCounter("dns.requests.received", metrics.DefaultRegistry)
+	c.ProxiedDNS = metrics.GetOrRegisterCounter("dns.requests.proxied", metrics.DefaultRegistry)
+	c.ReceivedHTTP = metrics.GetOrRegisterCounter("http.requests.received", metrics.DefaultRegistry)
+	c.ProxiedHTTP = metrics.GetOrRegisterCounter("http.requests.proxied", metrics.DefaultRegistry)
+	c.ReceivedHTTPS = metrics.GetOrRegisterCounter("https.requests.received", metrics.DefaultRegistry)
+	c.ProxiedHTTPS = metrics.GetOrRegisterCounter("https.requests.proxied", metrics.DefaultRegistry)
+
+	if c.BindPrometheus != "" {
+		p := prometheusmetrics.NewPrometheusProvider(metrics.DefaultRegistry, "sniproxy", c.PublicIPv4, prometheus.DefaultRegisterer, 1*time.Second)
+		go p.UpdatePrometheusMetrics()
+		go func() {
+			http.Handle("/metrics", promhttp.Handler())
+			logger.Info().Str(
+				"address", c.BindPrometheus,
+			).Msg("starting metrics server")
+			promServer := &http.Server{
+				Addr:              c.BindPrometheus,
+				Handler:           promhttp.Handler(),
+				ReadHeaderTimeout: 5 * time.Second,
+			}
+			if err := promServer.ListenAndServe(); err != nil {
+				logger.Error().Msgf("%s", err)
+			}
+		}()
+	}
+
+	// runtime context, canceled once a shutdown signal arrives
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Fail loudly at startup rather than at the first tick (the watcher) or at
+	// exit (--prof), which is where the missing profile would otherwise surface.
+	if (c.GoroutineLeakInterval > 0 || *prof == "goroutineleak") && !sniproxy.GoroutineLeakProfileAvailable() {
+		logger.Warn().Msgf(
+			"goroutine leak detection was requested, but this binary was built without it. rebuild with GOEXPERIMENT=%s",
+			sniproxy.GoroutineLeakExperiment,
+		)
+	}
+
+	// pprof server. this is deliberately a dedicated mux rather than the
+	// DefaultServeMux that importing net/http/pprof normally hijacks, so the
+	// debug handlers can never leak onto the metrics listener.
+	if c.BindPprof != "" {
+		if !isLoopbackAddr(c.BindPprof) {
+			logger.Warn().Msgf("pprof is bound to %s, which is not loopback. it exposes stack traces and lets anyone who can reach it trigger expensive profiles", c.BindPprof)
+		}
+
+		mux := http.NewServeMux()
+		// Index serves every named profile at /debug/pprof/<name>, which
+		// includes goroutineleak
+		mux.HandleFunc("/debug/pprof/", nethttppprof.Index)
+		mux.HandleFunc("/debug/pprof/cmdline", nethttppprof.Cmdline)
+		mux.HandleFunc("/debug/pprof/profile", nethttppprof.Profile)
+		mux.HandleFunc("/debug/pprof/symbol", nethttppprof.Symbol)
+		mux.HandleFunc("/debug/pprof/trace", nethttppprof.Trace)
+
+		pprofServer := &http.Server{
+			Addr:    c.BindPprof,
+			Handler: mux,
+			// no write timeout on purpose: CPU and trace profiles stream for
+			// 30s or longer by default
+			ReadHeaderTimeout: 5 * time.Second,
+		}
+		logger.Info().Str("address", c.BindPprof).Msgf("starting pprof server. goroutine leaks: http://%s/debug/pprof/%s?debug=1", c.BindPprof, sniproxy.GoroutineLeakProfile)
+		go func() {
+			if err := pprofServer.ListenAndServe(); err != nil {
+				logger.Error().Msgf("%s", err)
+			}
+		}()
+	}
+
+	// periodic goroutine leak detection. off unless an interval is configured,
+	// because every check forces a full GC.
+	if c.GoroutineLeakInterval > 0 {
+		leaked := metrics.GetOrRegisterGauge("goroutines.leaked", metrics.DefaultRegistry)
+		logger.Info().Msgf("goroutine leak detection enabled, checking every %s", c.GoroutineLeakInterval)
+		go sniproxy.WatchGoroutineLeaks(ctx, c.GoroutineLeakInterval, leaked, logger)
+	}
+
+	// generate self-signed certificate if not provided.
+	if c.TLSCert == "" && c.TLSKey == "" && (c.BindDNSOverTLS != "" || c.BindDNSOverQuic != "" || k.Bool("acl.override.enabled")) {
+		// generate a random 16 char string as hostname
+		hostname := uuid.NewString()[:16]
+		logger.Info().Msg("certificate was not provided, generating a self signed cert in temp directory")
+		_, _, err := doh.GenerateSelfSignedCertKey(hostname, nil, nil, os.TempDir())
+		if err != nil {
+			logger.Fatal().Err(err).Msg("failed to generate self-signed certificate")
+		}
+		c.TLSCert = filepath.Join(os.TempDir(), hostname+".crt")
+		c.TLSKey = filepath.Join(os.TempDir(), hostname+".key")
+	}
+
+	// if the "interface" configuration is provided, sniproxy must translate the interface name to the IP addresses
+	// and add them to the source address list
+	if c.Interface != "" {
+		logger.Info().Msgf("Using interface %s", c.Interface)
+		ief, err := net.InterfaceByName(c.Interface)
+		if err != nil {
+			logger.Fatal().Err(err).Msgf("failed to find interface %s", c.Interface)
+		}
+		addrs, err := ief.Addrs()
+		if err != nil {
+			logger.Fatal().Err(err).Msgf("failed to get addresses for interface %s", c.Interface)
+		}
+		var ipv4Count, ipv6Count int
+		for _, addr := range addrs {
+			ipAddr, err := netip.ParseAddr(strings.Split(addr.String(), "/")[0])
+			if err != nil {
+				logger.Warn().Msgf("failed to parse address %s: %v", addr.String(), err)
+				continue
+			}
+			c.SourceAddr = append(c.SourceAddr, ipAddr)
+			if ipAddr.Is4() {
+				ipv4Count++
+			} else if ipAddr.Is6() {
+				ipv6Count++
+			}
+		}
+		logger.Info().Msgf("Added %d IPv4 and %d IPv6 source addresses from interface %s", ipv4Count, ipv6Count, c.Interface)
+	}
+
+	// set up dialer based on SOCKS5 configuration
+	if err := c.SetDialer(logger); err != nil {
+		logger.Error().Msgf("error setting up dialer: %v", err)
+		return
+	}
+
+	// set up the DNS Client based on the configuration
+	if err := c.SetDNSClient(logger); err != nil {
+		logger.Error().Msgf("error setting up DNS client: %v", err)
+		return
+	}
+
+	// get a list of http and https binds
+	if err := c.SetBindHTTPListeners(logger); err != nil {
+		logger.Error().Msgf("error setting up HTTP listeners: %v", err)
+		return
+	}
+	logger.Info().Msgf("HTTP listeners: %v", c.BindHTTPListeners)
+	if err := c.SetBindHTTPSListeners(logger); err != nil {
+		logger.Error().Msgf("error setting up HTTPS listeners: %v", err)
+		return
+	}
+	logger.Info().Msgf("HTTPS listeners: %v", c.BindHTTPSListeners)
+
+	for _, addr := range c.BindHTTPListeners {
+		go sniproxy.RunHTTP(&c, addr, logger)
+	}
+	for _, addr := range c.BindHTTPSListeners {
+		go sniproxy.RunHTTPS(&c, addr, logger)
+	}
+	go sniproxy.RunDNS(&c, logger)
+
+	// Set up signal handling for graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	sig := <-sigChan
+	logger.Info().Msgf("received signal %v, shutting down gracefully...", sig)
+	cancel()
+
+	// Stop ACL refresh goroutines
+	acl.StopACLs(c.ACL)
+	logger.Info().Msg("ACL refresh goroutines stopped")
+
+	// Allow some time for in-flight connections to finish
+	time.Sleep(2 * time.Second)
+	logger.Info().Msg("shutdown complete")
+}

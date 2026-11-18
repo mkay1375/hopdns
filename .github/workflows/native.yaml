@@ -1,0 +1,116 @@
+name: Build and test native applications
+
+on:
+  push:
+    branches: [main, native-single-binary]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: linux-amd64
+            executable: hopdns
+          - runner: ubuntu-24.04-arm
+            target: linux-arm64
+            executable: hopdns
+          - runner: macos-15-intel
+            target: darwin-amd64
+            executable: hopdns
+          - runner: macos-15
+            target: darwin-arm64
+            executable: hopdns
+          - runner: windows-2025
+            target: windows-amd64
+            executable: hopdns.exe
+          - runner: windows-11-arm
+            target: windows-arm64
+            executable: hopdns.exe
+    defaults:
+      run:
+        shell: bash
+    env:
+      CGO_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26'
+          cache-dependency-path: |
+            go.sum
+            third_party/sniproxy/go.sum
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+      - name: Verify native runner architecture
+        env:
+          EXPECTED_TARGET: ${{ matrix.target }}
+        run: test "$(go env GOOS)-$(go env GOARCH)" = "$EXPECTED_TARGET"
+      - name: Test native control API
+        run: go test ./... -count=1
+      - name: Test reviewed engine corrections
+        working-directory: third_party/sniproxy
+        run: go test ./pkg ./pkg/acl -run TestHopDNS -count=1
+      - name: Build standalone executable
+        env:
+          TARGET_EXECUTABLE: ${{ matrix.executable }}
+        run: |
+          mkdir -p dist
+          go build -trimpath -ldflags "-s -w -X main.version=native-${GITHUB_SHA:0:7} -X main.commit=$GITHUB_SHA" -o "dist/$TARGET_EXECUTABLE" ./cmd/hopdns
+      - name: Test the executable against offline DNS and HTTP/TLS origins
+        env:
+          TARGET_EXECUTABLE: ${{ matrix.executable }}
+        run: python tests/native_smoke.py --binary "dist/$TARGET_EXECUTABLE"
+      - name: Package executable and required notices
+        env:
+          TARGET_NAME: ${{ matrix.target }}
+          TARGET_EXECUTABLE: ${{ matrix.executable }}
+        run: python scripts/package_native.py --binary "dist/$TARGET_EXECUTABLE" --target "$TARGET_NAME" --go-license "$(go env GOROOT)/LICENSE"
+      - uses: actions/setup-node@v6
+        if: matrix.target == 'linux-amd64'
+        with:
+          node-version: '24'
+      - name: Browser panel and theme checks
+        if: matrix.target == 'linux-amd64'
+        run: |
+          npm install --prefix "$RUNNER_TEMP/hopdns-playwright" playwright@1.65.1
+          "$RUNNER_TEMP/hopdns-playwright/node_modules/.bin/playwright" install --with-deps chromium
+          mkdir -p "$RUNNER_TEMP/hopdns-ui" "$RUNNER_TEMP/hopdns-ui-settings"
+          ./dist/hopdns --no-browser --panel 127.0.0.1:48841 --data-dir "$RUNNER_TEMP/hopdns-ui-settings" > "$RUNNER_TEMP/hopdns-ui/terminal.log" 2>&1 &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true; wait "$app_pid" || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:48841/healthz >/dev/null; then break; fi
+            if [ "$attempt" = 30 ]; then cat "$RUNNER_TEMP/hopdns-ui/terminal.log"; exit 1; fi
+            sleep 1
+          done
+          PANEL_URL=http://127.0.0.1:48841 ARTIFACTS="$RUNNER_TEMP/hopdns-ui" PLAYWRIGHT_MODULE="$RUNNER_TEMP/hopdns-playwright/node_modules/playwright" node tests/ui_smoke.cjs
+      - uses: actions/upload-artifact@v6
+        with:
+          name: hopdns-${{ matrix.target }}
+          path: |
+            dist/*.zip
+            dist/*.tar.gz
+            dist/*SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v6
+        if: always() && matrix.target == 'linux-amd64'
+        with:
+          name: native-panel-screenshots
+          path: ${{ runner.temp }}/hopdns-ui
+          if-no-files-found: ignore
