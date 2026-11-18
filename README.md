@@ -12,8 +12,8 @@ Manage it from your browser.
 
 ## Get started
 
-**Native app.** Download the archive for your OS and processor from a successful
-[main build](https://github.com/mkay1375/hopdns/actions/workflows/native.yaml?query=branch%3Amain+event%3Apush+is%3Asuccess).
+**Native app.** Download the archive for your OS and processor under **Assets**
+on the [latest release](https://github.com/mkay1375/hopdns/releases/latest). No GitHub account is needed.
 Extract it and run `./hopdns` in Terminal or `.\hopdns.exe` in PowerShell.
 The app opens your browser at [localhost:48741](http://localhost:48741).
 

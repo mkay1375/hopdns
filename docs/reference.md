@@ -9,10 +9,10 @@ with the DNS relay and browser panel bundled inside. End users need no Docker,
 Python, Go installation, or separate web files. Keep the terminal open while
 HopDNS runs. It opens the panel in your default browser and prints its URL.
 
-Download the artifact for your operating system and CPU from a successful
-[Native application workflow](https://github.com/mkay1375/hopdns/actions/workflows/native.yaml).
-Each archive contains one application executable, license notices, and a
-SHA-256 checksum. The notices are legal documentation and are not runtime assets.
+Download the archive for your operating system and CPU from the **Assets** on
+the [latest public release](https://github.com/mkay1375/hopdns/releases/latest). Each archive contains one
+application executable and license notices. The release provides SHA-256
+checksums alongside the archives.
 
 On macOS or Linux, extract the archive and run from Terminal:
 
