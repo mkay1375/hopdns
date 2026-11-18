@@ -2,7 +2,6 @@ package sniproxy
 
 import (
 	"context"
-	"io"
 	"net"
 	"net/http"
 	"net/netip"
@@ -189,6 +188,9 @@ func handle80(c *Config, l zerolog.Logger, transport *http.Transport) http.Handl
 		}
 		rr.URL.Scheme = "http"
 		rr.URL.Host = r.Host
+		if rr.Body != nil && rr.Body != http.NoBody && c.RelayBytesToOrigin != nil {
+			rr.Body = relayBody{ReadCloser: rr.Body, counter: c.RelayBytesToOrigin}
+		}
 
 		// Forward request to origin server
 		resp, err := transport.RoundTrip(&rr)
@@ -212,7 +214,7 @@ func handle80(c *Config, l zerolog.Logger, transport *http.Transport) http.Handl
 		w.WriteHeader(resp.StatusCode)
 
 		// Transfer response from origin server -> client
-		if _, err := io.Copy(w, resp.Body); err != nil {
+		if err := copyRelayBody(w, resp.Body, c.RelayBytesToClient); err != nil {
 			l.Debug().Err(err).Msg("error copying response body")
 		}
 	}

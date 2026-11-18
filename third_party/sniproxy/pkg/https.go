@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mosajjal/sniproxy/v2/pkg/acl"
+	"github.com/rcrowley/go-metrics"
 	"github.com/rs/zerolog"
 	"golang.org/x/net/proxy"
 )
@@ -164,14 +165,16 @@ func handleTLS(c *Config, conn net.Conn, l zerolog.Logger) error {
 	defer func() { _ = target.Close() }()
 
 	c.ProxiedHTTPS.Inc(1)
-	if _, err := target.Write(incoming[:n]); err != nil {
+	written, err := target.Write(incoming[:n])
+	addRelayBytes(c.RelayBytesToOrigin, int64(written))
+	if err != nil {
 		l.Error().Err(err).Msg("failed to write ClientHello to target")
 		return err
 	}
 
 	errc := make(chan error, 2)
-	go proxyCopy(errc, conn, target)
-	go proxyCopy(errc, target, conn)
+	go proxyCopy(errc, conn, target, c.RelayBytesToClient)
+	go proxyCopy(errc, target, conn, c.RelayBytesToOrigin)
 	<-errc
 	<-errc
 	return nil
@@ -201,8 +204,8 @@ func readClientHello(conn net.Conn, buf []byte) (int, error) {
 	return n, nil
 }
 
-func proxyCopy(errc chan<- error, dst, src net.Conn) {
-	_, err := io.Copy(dst, src)
+func proxyCopy(errc chan<- error, dst, src net.Conn, counter metrics.Counter) {
+	err := copyRelayStream(dst, src, counter)
 	// Relay the source FIN without closing the reverse stream. A client can
 	// finish uploading and still need to read its response; an origin can
 	// finish its response without sending a TLS close_notify record.

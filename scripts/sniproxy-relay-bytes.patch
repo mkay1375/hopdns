@@ -1,0 +1,177 @@
+--- a/pkg/conf.go
++++ b/pkg/conf.go
+@@ -114,6 +114,9 @@
+ 	ProxiedHTTPS  metrics.Counter `yaml:"-"`
+ 	ReceivedDNS   metrics.Counter `yaml:"-"`
+ 	ProxiedDNS    metrics.Counter `yaml:"-"`
++
++	RelayBytesToClient metrics.Counter `yaml:"-"`
++	RelayBytesToOrigin metrics.Counter `yaml:"-"`
+ }
+ 
+ const (
+--- a/pkg/httpproxy.go
++++ b/pkg/httpproxy.go
+@@ -2,7 +2,6 @@
+ 
+ import (
+ 	"context"
+-	"io"
+ 	"net"
+ 	"net/http"
+ 	"net/netip"
+@@ -189,6 +188,9 @@
+ 		}
+ 		rr.URL.Scheme = "http"
+ 		rr.URL.Host = r.Host
++		if rr.Body != nil && rr.Body != http.NoBody && c.RelayBytesToOrigin != nil {
++			rr.Body = relayBody{ReadCloser: rr.Body, counter: c.RelayBytesToOrigin}
++		}
+ 
+ 		// Forward request to origin server
+ 		resp, err := transport.RoundTrip(&rr)
+@@ -212,7 +214,7 @@
+ 		w.WriteHeader(resp.StatusCode)
+ 
+ 		// Transfer response from origin server -> client
+-		if _, err := io.Copy(w, resp.Body); err != nil {
++		if err := copyRelayBody(w, resp.Body, c.RelayBytesToClient); err != nil {
+ 			l.Debug().Err(err).Msg("error copying response body")
+ 		}
+ 	}
+--- a/pkg/https.go
++++ b/pkg/https.go
+@@ -11,6 +11,7 @@
+ 	"time"
+ 
+ 	"github.com/mosajjal/sniproxy/v2/pkg/acl"
++	"github.com/rcrowley/go-metrics"
+ 	"github.com/rs/zerolog"
+ 	"golang.org/x/net/proxy"
+ )
+@@ -164,14 +165,16 @@
+ 	defer func() { _ = target.Close() }()
+ 
+ 	c.ProxiedHTTPS.Inc(1)
+-	if _, err := target.Write(incoming[:n]); err != nil {
++	written, err := target.Write(incoming[:n])
++	addRelayBytes(c.RelayBytesToOrigin, int64(written))
++	if err != nil {
+ 		l.Error().Err(err).Msg("failed to write ClientHello to target")
+ 		return err
+ 	}
+ 
+ 	errc := make(chan error, 2)
+-	go proxyCopy(errc, conn, target)
+-	go proxyCopy(errc, target, conn)
++	go proxyCopy(errc, conn, target, c.RelayBytesToClient)
++	go proxyCopy(errc, target, conn, c.RelayBytesToOrigin)
+ 	<-errc
+ 	<-errc
+ 	return nil
+@@ -201,8 +204,8 @@
+ 	return n, nil
+ }
+ 
+-func proxyCopy(errc chan<- error, dst, src net.Conn) {
+-	_, err := io.Copy(dst, src)
++func proxyCopy(errc chan<- error, dst, src net.Conn, counter metrics.Counter) {
++	err := copyRelayStream(dst, src, counter)
+ 	// Relay the source FIN without closing the reverse stream. A client can
+ 	// finish uploading and still need to read its response; an origin can
+ 	// finish its response without sending a TLS close_notify record.
+--- a/pkg/goroutineleak_test.go
++++ b/pkg/goroutineleak_test.go
+@@ -287,8 +287,8 @@
+ 		b1, b2 := net.Pipe()
+ 
+ 		errc := make(chan error, 2)
+-		go proxyCopy(errc, a1, b2)
+-		go proxyCopy(errc, b1, a2)
++		go proxyCopy(errc, a1, b2, nil)
++		go proxyCopy(errc, b1, a2, nil)
+ 
+ 		// Write some data through
+ 		go func() {
+--- /dev/null
++++ b/pkg/relay_bytes.go
+@@ -0,0 +1,68 @@
++package sniproxy
++
++import (
++	"io"
++	"net"
++	"runtime"
++
++	"github.com/rcrowley/go-metrics"
++)
++
++const relayCopyChunk = 64 << 10
++
++type relayBody struct {
++	io.ReadCloser
++	counter metrics.Counter
++}
++
++func (body relayBody) Read(p []byte) (int, error) {
++	n, err := body.ReadCloser.Read(p)
++	addRelayBytes(body.counter, int64(n))
++	return n, err
++}
++
++type relayWriter struct {
++	io.Writer
++	counter metrics.Counter
++}
++
++func (writer relayWriter) Write(p []byte) (int, error) {
++	n, err := writer.Writer.Write(p)
++	addRelayBytes(writer.counter, int64(n))
++	return n, err
++}
++
++func addRelayBytes(counter metrics.Counter, n int64) {
++	if counter != nil && n > 0 {
++		counter.Inc(n)
++	}
++}
++
++func copyRelayBody(dst io.Writer, src io.Reader, counter metrics.Counter) error {
++	if counter != nil {
++		dst = relayWriter{Writer: dst, counter: counter}
++	}
++	_, err := io.Copy(dst, src)
++	return err
++}
++
++func copyRelayStream(dst, src net.Conn, counter metrics.Counter) error {
++	if runtime.GOOS == "linux" && counter != nil {
++		dstTCP, directDestination := dst.(*net.TCPConn)
++		_, directSource := src.(*net.TCPConn)
++		if directDestination && directSource {
++			// Preserve TCPConn.ReadFrom's splice fast path with a LimitedReader.
++			// Each completed window becomes visible while the stream is open.
++			limited := &io.LimitedReader{R: src}
++			for {
++				limited.N = relayCopyChunk
++				n, err := io.Copy(dstTCP, limited)
++				addRelayBytes(counter, n)
++				if err != nil || limited.N > 0 {
++					return err
++				}
++			}
++		}
++	}
++	return copyRelayBody(dst, src, counter)
++}
+--- a/cmd/sniproxy/main.go
++++ b/cmd/sniproxy/main.go
+@@ -295,6 +295,8 @@
+ 	c.ProxiedHTTPS = metrics.GetOrRegisterCounter("https.requests.proxied", metrics.DefaultRegistry)
+ 
+ 	if c.BindPrometheus != "" {
++		c.RelayBytesToClient = metrics.GetOrRegisterCounter("relay.bytes.to_client", metrics.DefaultRegistry)
++		c.RelayBytesToOrigin = metrics.GetOrRegisterCounter("relay.bytes.to_origin", metrics.DefaultRegistry)
+ 		p := prometheusmetrics.NewPrometheusProvider(metrics.DefaultRegistry, "sniproxy", c.PublicIPv4, prometheus.DefaultRegisterer, 1*time.Second)
+ 		go p.UpdatePrometheusMetrics()
+ 		go func() {

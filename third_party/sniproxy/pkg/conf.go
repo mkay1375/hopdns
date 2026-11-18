@@ -114,6 +114,9 @@ type Config struct {
 	ProxiedHTTPS  metrics.Counter `yaml:"-"`
 	ReceivedDNS   metrics.Counter `yaml:"-"`
 	ProxiedDNS    metrics.Counter `yaml:"-"`
+
+	RelayBytesToClient metrics.Counter `yaml:"-"`
+	RelayBytesToOrigin metrics.Counter `yaml:"-"`
 }
 
 const (

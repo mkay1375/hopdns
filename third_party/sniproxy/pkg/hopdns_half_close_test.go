@@ -44,8 +44,8 @@ func TestHopDNSHalfClose(t *testing.T) {
 			client, proxyClient := hopDNSTCPPair(t)
 			proxyOrigin, origin := hopDNSTCPPair(t)
 			errors := make(chan error, 2)
-			go proxyCopy(errors, proxyOrigin, proxyClient)
-			go proxyCopy(errors, proxyClient, proxyOrigin)
+			go proxyCopy(errors, proxyOrigin, proxyClient, nil)
+			go proxyCopy(errors, proxyClient, proxyOrigin, nil)
 
 			sendAndFinish := func(source *net.TCPConn, destination *net.TCPConn, data string) {
 				t.Helper()

@@ -287,8 +287,8 @@ func TestProxyCopy_NoGoroutineLeaks(t *testing.T) {
 		b1, b2 := net.Pipe()
 
 		errc := make(chan error, 2)
-		go proxyCopy(errc, a1, b2)
-		go proxyCopy(errc, b1, a2)
+		go proxyCopy(errc, a1, b2, nil)
+		go proxyCopy(errc, b1, a2, nil)
 
 		// Write some data through
 		go func() {

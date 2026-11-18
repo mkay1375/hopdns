@@ -297,6 +297,8 @@ func Run(args []string) {
 	c.ProxiedHTTPS = metrics.GetOrRegisterCounter("https.requests.proxied", metrics.DefaultRegistry)
 
 	if c.BindPrometheus != "" {
+		c.RelayBytesToClient = metrics.GetOrRegisterCounter("relay.bytes.to_client", metrics.DefaultRegistry)
+		c.RelayBytesToOrigin = metrics.GetOrRegisterCounter("relay.bytes.to_origin", metrics.DefaultRegistry)
 		p := prometheusmetrics.NewPrometheusProvider(metrics.DefaultRegistry, "sniproxy", c.PublicIPv4, prometheus.DefaultRegisterer, 1*time.Second)
 		go p.UpdatePrometheusMetrics()
 		go func() {
