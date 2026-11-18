@@ -111,6 +111,10 @@
         <p>Use your regular home Wi-Fi or a cable connected to the same router. Guest Wi-Fi often keeps devices from reaching each other. Your computer’s address can change after a restart or a switch between Wi-Fi and Ethernet. If it changed, start HopDNS with the new address, update it in the panel, and enter it again on the console.</p>
       </details>
       <details>
+        <summary>Try All domains if a site still won’t load</summary>
+        <p>If <strong>DNS queries</strong> is increasing in the HopDNS panel but a site still won’t load, go to <strong>Routing</strong>, choose <strong>All domains</strong>, and click <strong>Save routing</strong>. Reopen the affected app or retry the site on your console. This tests whether the site needs a domain that was missing from your list. After testing, choose <strong>Selected domains</strong> again and save. <strong>All domains</strong> still only relays compatible web connections.</p>
+      </details>
+      <details>
         <summary>Read the error message in the terminal</summary>
         <ul>
           <li><strong>Address already in use:</strong> Close any earlier copy of HopDNS, including a copy running in Docker, then try again.</li>
