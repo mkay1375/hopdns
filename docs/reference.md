@@ -81,11 +81,9 @@ keeps error messages visible. Press **Ctrl+C** to stop the panel and its engine
 child process. The application executes its own file as that child, so both
 processes use the same single binary.
 
-Native bandwidth totals cover the host's non-loopback interfaces, including
-other applications. VPN interfaces can count the same transfer again. Active
-connections are sampled for the engine process and configured relay ports.
-Collection happens every five seconds outside forwarding, and unavailable OS
-statistics are shown as unavailable.
+The native panel shows data forwarded by HopDNS and samples established TCP
+connections on the relay ports. The [monitoring section](#monitoring-and-themes)
+describes the same transfer totals and rates for native and Docker installs.
 
 To build from source with Go 1.26 or later:
 
@@ -262,9 +260,8 @@ changes immediately; only the theme preference is stored in browser localStorage
 Routing configuration is stored server-side.
 
 Python is outside the forwarding path. The engine is built from a pinned
-upstream source revision with reviewed corrections for domain-boundary matching,
-loading routing rules before startup, and propagating TCP half-closes. They add
-no per-request monitoring hooks.
+upstream source revision with reviewed changes for domain matching, startup,
+TCP half-closes, and relay byte counters.
 One worker samples every five seconds and caches a shared snapshot for all
 viewers. Browser polling pauses in hidden tabs; history is bounded to 120 samples
 (about ten minutes). No traffic payloads, per-request database writes, or
@@ -272,16 +269,15 @@ per-domain request logs are added.
 
 | Metric | What it measures |
 | --- | --- |
-| Active connections | Established incoming TCP sockets on ports 80/443, sampled from Linux `/proc`; includes connections still negotiating |
-| DNS requests / selected queries | Upstream engine counters; reset when the engine restarts |
-| HTTPS connections / HTTP requests | Engine connection attempts and request counters, not unique users |
+| Active connections | Established incoming TCP sockets on the configured relay ports, including connections still negotiating |
+| DNS requests / selected queries | DNS queries received by the relay and queries matched for routing |
+| HTTPS sessions / HTTP requests relayed | Sessions and requests the engine has sent to an origin |
 | Relayed requests / sessions | Combined upstream successful HTTPS connections and HTTP requests |
 | Domains | Configured domain rules, not unique domains observed in traffic; all mode can cover more |
-| Receive / transmit totals and rates | Container `eth0` traffic, including both relay legs, DNS, and panel overhead; not payload-only bandwidth |
+| Relayed web data and traffic rates | HTTP body bytes and HTTPS tunnel bytes, including the forwarded TLS handshake. Each forwarded byte is counted once in its direction. |
 
-Unavailable samples appear as unavailable, rather than invented zeroes. Bandwidth
-totals are kernel interface counters and survive engine restarts until the
-container/network interface is recreated; rates/history reset on engine restart.
+Counters and chart history reset when the relay restarts. Rates use the difference
+between two samples. Unavailable values display as a dash.
 The lightweight collection still consumes some CPU and memory: zero overhead is
 not possible. Measure on the target machine before capacity planning. The
 256 MiB/128-process Compose limits are conservative starting points, not a

@@ -24,9 +24,10 @@ const base = process.env.PANEL_URL || 'http://127.0.0.1:8787';
         state: 'running', engine_running: true, error: null, uptime_seconds: 5020,
         active_connections: 7, proxied_connections: 213, domain_count: config.domains.length,
         dns_requests: 621, dns_proxied: 420, http_requests: 12, https_connections: 207,
+        http_proxied: 9, https_proxied: 204,
         rx_bytes: 501234567, tx_bytes: 12543210, rx_bytes_per_second: 252400, tx_bytes_per_second: 34000,
         mode: config.mode, sampled_at: new Date().toISOString(), sample_interval_seconds: 5,
-        bandwidth_scope: 'Container network (includes DNS and panel traffic)',
+        bandwidth_scope: 'HTTP bodies and HTTPS tunnel bytes forwarded by HopDNS',
         history: Array.from({length: 60}, (_, i) => ({at: new Date(Date.now() - (59-i)*5000).toISOString(),rx_bytes_per_second: 80000+Math.sin(i/3)*40000+i*1200,tx_bytes_per_second: 16000+Math.cos(i/4)*7000}))
       }});
     });
@@ -34,6 +35,9 @@ const base = process.env.PANEL_URL || 'http://127.0.0.1:8787';
     await page.locator('#engine-badge').getByText('Relay running').waitFor();
     assert.equal(await page.locator('#active-connections').textContent(), '7');
     assert.equal(await page.locator('#domain-count').textContent(), '2');
+    assert.equal(await page.locator('#http-requests').textContent(), '9');
+    assert.equal(await page.locator('#https-connections').textContent(), '204');
+    assert.equal(await page.locator('#network-transfer').textContent(), '490 MiB');
     assert.equal(await page.locator('#domains').inputValue(), 'example.com\nplaystation.net');
     await page.locator('#theme').selectOption('dark');
     assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');

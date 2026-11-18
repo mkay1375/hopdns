@@ -19,8 +19,8 @@ private origins. Production parent configuration must refuse private origins.
 
 Native builds must remain self-contained. Keep the browser assets embedded and
 launch the same executable as the engine child. Preserve the loopback panel,
-native `0.0.0.0` traffic default, bounded monitoring, and graceful child cleanup. Native network
-statistics describe host interfaces rather than container-only bandwidth.
+native `0.0.0.0` traffic default, bounded monitoring, and graceful child cleanup.
+Transfer statistics count bytes forwarded by the relay in both deployments.
 
 
 - `app/server.py`: standard-library Python API, supervised upstream engine, sampled monitoring.
@@ -40,8 +40,8 @@ for browser smoke and screenshots. No release or publication is implied by local
 ## Security and performance
 
 Keep proxy forwarding in the pinned-source sniproxy executable with only the
-reviewed domain-boundary/startup and TCP half-close patches in `scripts/`. The
-Docker build must apply both patches and run their Go regression tests before
+reviewed domain-boundary/startup, TCP half-close, and relay byte counting patches
+in `scripts/`. The Docker build must apply them and run their Go regression tests before
 compiling for each target.
 The panel is a separate process and must not sit in the forwarding path. Sample
 and cache metrics centrally; do not add per-request logging, database writes,

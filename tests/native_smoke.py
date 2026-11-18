@@ -259,6 +259,8 @@ def main():
         assert f'DNS: 0.0.0.0:{ports[0]}' in lan.log.read_text(errors='replace')
         if address := lan_config['public_ipv4']:
             wait_until(lambda: lan.api()['state'] == 'running', 'automatic LAN engine readiness')
+            idle = lan.api()
+            assert idle['rx_bytes'] == idle['tx_bytes'] == idle['https_proxied'] == 0, idle
             assert dns_query(ports[0], 'xbox.com', host=address) == address
             assert dns_query(ports[0], 'xboxlive.com', tcp=True, host=address) == address
             assert dns_query(ports[0], 'playstation.net', host=address) == address
@@ -308,7 +310,9 @@ def main():
         time.sleep(6)
         attempts = app.api()['https_connections']
         time.sleep(11)
-        assert app.api()['https_connections'] == attempts
+        idle = app.api()
+        assert idle['https_connections'] == attempts
+        assert idle['rx_bytes'] == idle['tx_bytes'] == idle['https_proxied'] == 0, idle
         app.stop()
         # Parent shutdown must release both child forwarding ports and panel.
         for port in ports:

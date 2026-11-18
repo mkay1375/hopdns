@@ -92,10 +92,10 @@
     $('uptime').textContent = duration(status.uptime_seconds);
     $('dns-requests').textContent = number(status.dns_requests);
     $('dns-proxied').textContent = number(status.dns_proxied);
-    $('http-requests').textContent = number(status.http_requests);
-    $('https-connections').textContent = number(status.https_connections);
+    $('http-requests').textContent = number(status.http_proxied);
+    $('https-connections').textContent = number(status.https_proxied);
     $('route-mode').textContent = status.mode === 'all' ? 'All domains' : 'Selected domains';
-    $('bandwidth-scope').textContent = `${status.bandwidth_scope || 'Container network (includes DNS and panel traffic)'}. Sampled every ${status.sample_interval_seconds || 5} seconds.`;
+    $('bandwidth-scope').textContent = `${status.bandwidth_scope || 'HTTP bodies and HTTPS tunnel bytes forwarded by HopDNS'}. Sampled every ${status.sample_interval_seconds || 5} seconds.`;
     renderChart(status.history || []);
     renderSampleAge();
   }

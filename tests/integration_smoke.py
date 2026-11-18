@@ -117,7 +117,33 @@ def request_http(name):
     response=conn.getresponse();body=response.read();conn.close()
     assert response.status==200 and b'hopdns-offline-origin' in body
 '''
-            python(common + f"\nconfig={config!r}\nassert api()['state']=='setup_required'\nassert save(config)['restarted']\nready()\nassert dns('selected.hopdns.test',kind=28) is None\nassert dns('selected.hopdns.test')=={app_ip!r}\nassert dns('selected.hopdns.test',True)=={app_ip!r}\nassert dns('sub.selected.hopdns.test')=={app_ip!r}\nassert dns('evil-selected.hopdns.test')=={origin_ip!r}\nassert dns('other.hopdns.test')=={origin_ip!r}\nrequest_http('selected.hopdns.test')\ntls('selected.hopdns.test')\n")
+            python(common + f'''
+config={config!r}
+assert api()['state']=='setup_required'
+assert save(config)['restarted']
+idle=ready()
+assert idle['rx_bytes']==idle['tx_bytes']==idle['https_proxied']==0, idle
+assert dns('selected.hopdns.test',kind=28) is None
+assert dns('selected.hopdns.test')=={app_ip!r}
+assert dns('selected.hopdns.test',True)=={app_ip!r}
+assert dns('sub.selected.hopdns.test')=={app_ip!r}
+assert dns('evil-selected.hopdns.test')=={origin_ip!r}
+assert dns('other.hopdns.test')=={origin_ip!r}
+for _ in range(40):
+    idle=api()
+    if (idle['dns_requests'] or 0)>=6:break
+    time.sleep(.25)
+else:raise AssertionError(idle)
+assert idle['rx_bytes']==idle['tx_bytes']==0, idle
+request_http('selected.hopdns.test')
+for _ in range(40):
+    forwarded=api()
+    if forwarded['http_proxied']==1:break
+    time.sleep(.25)
+else:raise AssertionError(forwarded)
+assert forwarded['rx_bytes']==len(b'hopdns-offline-origin\\n')*4096 and forwarded['tx_bytes']==0, forwarded
+tls('selected.hopdns.test')
+''')
             # Polling is concurrent with real traffic. This is correctness under
             # dashboard load, not a benchmark or a claim of zero overhead.
             python(common + '''
@@ -137,12 +163,13 @@ assert conn.getresponse().status==403
 conn.close()
 for _ in range(40):
     status=api()
-    if (status['dns_requests'] or 0)>=5 and (status['https_connections'] or 0)>=6 and (status['http_requests'] or 0)>=6:break
+    if (status['dns_requests'] or 0)>=6 and (status['https_proxied'] or 0)>=6 and (status['http_proxied'] or 0)>=6:break
     time.sleep(.25)
 else:raise AssertionError(status)
 assert status['rx_bytes']>0 and status['tx_bytes']>0
 assert len(status['history'])<=120
-config=api('/api/config');config['mode']='all';assert save(config)['restarted'];ready()
+config=api('/api/config');config['mode']='all';assert save(config)['restarted'];idle=ready()
+assert idle['rx_bytes']==idle['tx_bytes']==idle['https_proxied']==0, idle
 conn=http.client.HTTPConnection('127.0.0.1',80,timeout=3);conn.request('GET','/',headers={'Host':'127.0.0.1:8787'});assert conn.getresponse().status==404;conn.close()
 '''+f"assert dns('other.hopdns.test')=={app_ip!r}\ntls('other.hopdns.test')\n")
             docker('restart', app)
