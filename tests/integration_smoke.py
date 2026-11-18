@@ -136,12 +136,13 @@ for _ in range(40):
 else:raise AssertionError(idle)
 assert idle['rx_bytes']==idle['tx_bytes']==0, idle
 request_http('selected.hopdns.test')
+body_size=len(b'hopdns-offline-origin\\n')*4096
 for _ in range(40):
     forwarded=api()
-    if forwarded['http_proxied']==1:break
+    if forwarded['http_proxied']==1 and (forwarded['rx_bytes'] or 0)>=body_size:break
     time.sleep(.25)
 else:raise AssertionError(forwarded)
-assert forwarded['rx_bytes']==len(b'hopdns-offline-origin\\n')*4096 and forwarded['tx_bytes']==0, forwarded
+assert forwarded['rx_bytes']==body_size and forwarded['tx_bytes']==0, forwarded
 tls('selected.hopdns.test')
 ''')
             # Polling is concurrent with real traffic. This is correctness under
