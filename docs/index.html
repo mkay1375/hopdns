@@ -66,7 +66,7 @@
       <section class="instructions">
         <h2>Connect your Xbox or PlayStation</h2>
         <ol>
-          <li><strong>Copy the DNS address from the HopDNS panel.</strong> Connect your computer and console to the same home network. If the panel doesn’t open automatically, go to <a href="http://localhost:48741/#connect">localhost:48741</a> on the computer running HopDNS. Open <strong>Connect a device</strong> and copy the address shown there.</li>
+          <li><strong>Copy the DNS address from the HopDNS panel.</strong> Connect your computer and console to the same home network. If the panel doesn’t open automatically, go to <a href="http://localhost:48741/#connect">localhost:48741</a> on the computer running HopDNS. Once the panel shows <strong>Relay running</strong>, open <strong>Connect a device</strong> and copy the address shown there.</li>
           <li>
             <strong id="console-dns-title">Change DNS on your console.</strong>
             <div id="console-tabs" class="guide-tabs nested-tabs" aria-labelledby="console-dns-title" hidden>
@@ -124,7 +124,7 @@
         <summary>Read the error message in the terminal</summary>
         <ul>
           <li><strong>Address already in use:</strong> Close any earlier copy of HopDNS, including a copy running in Docker, then try again.</li>
-          <li><strong>Permission denied on Mac or Linux:</strong> If the relay can’t open a network port, follow the administrator startup steps in the <a href="https://github.com/mkay1375/hopdns/blob/main/docs/reference.md#native-application">technical guide</a>.</li>
+          <li><strong>Permission denied on Mac or Linux:</strong> Press <strong>Ctrl+C</strong> to stop HopDNS, then run <code>sudo ./hopdns --no-browser</code> from the same folder and open <a href="http://localhost:48741/#connect">localhost:48741</a> in your browser.</li>
         </ul>
       </details>
     </section>

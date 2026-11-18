@@ -66,7 +66,7 @@
       <section class="instructions">
         <h2>اتصال ایکس‌باکس یا پلی‌استیشن</h2>
         <ol>
-          <li><strong>نشانی <bdi>DNS</bdi> را از پنل کپی کنید.</strong> رایانه و کنسول را به یک شبکهٔ خانگی وصل کنید. اگر پنل خودکار باز نشد، در رایانه‌ای که <bdi>HopDNS</bdi> روی آن اجراست به <a href="http://localhost:48741/#connect" dir="ltr">localhost:48741</a> بروید. بخش <bdi><strong>Connect a device</strong></bdi> را باز کنید و نشانی نمایش‌داده‌شده را کپی کنید.</li>
+          <li><strong>نشانی <bdi>DNS</bdi> را از پنل کپی کنید.</strong> رایانه و کنسول را به یک شبکهٔ خانگی وصل کنید. اگر پنل خودکار باز نشد، در رایانه‌ای که <bdi>HopDNS</bdi> روی آن اجراست به <a href="http://localhost:48741/#connect" dir="ltr">localhost:48741</a> بروید. وقتی <bdi><strong>Relay running</strong></bdi> را در پنل دیدید، بخش <bdi><strong>Connect a device</strong></bdi> را باز کنید و نشانی نمایش‌داده‌شده را کپی کنید.</li>
           <li>
             <strong id="console-dns-title"><bdi>DNS</bdi> کنسول را تغییر دهید.</strong>
             <div id="console-tabs" class="guide-tabs nested-tabs" aria-labelledby="console-dns-title" hidden>
@@ -124,7 +124,7 @@
         <summary>پیام خطای ترمینال را بخوانید</summary>
         <ul>
           <li><strong><bdi>Address already in use</bdi>.</strong> اگر نسخهٔ دیگری از <bdi>HopDNS</bdi> باز است، از جمله نسخه‌ای که در داکر اجرا می‌شود، آن را ببندید و دوباره امتحان کنید.</li>
-          <li><strong><bdi>Permission denied</bdi> در مک یا لینوکس.</strong> اگر برنامه اجازهٔ باز کردن پورت شبکه را ندارد، مراحل اجرا با دسترسی مدیر را در <a href="https://github.com/mkay1375/hopdns/blob/main/docs/reference.md#native-application">راهنمای فنی (انگلیسی)</a> ببینید.</li>
+          <li><strong><bdi>Permission denied</bdi> در مک یا لینوکس.</strong> با <bdi><strong>Ctrl+C</strong></bdi> برنامه را متوقف کنید، در همان پوشه <code>sudo ./hopdns --no-browser</code> را اجرا کنید و در مرورگر به <a href="http://localhost:48741/#connect" dir="ltr">localhost:48741</a> بروید.</li>
         </ul>
       </details>
     </section>
