@@ -6,6 +6,7 @@
   <meta name="description" content="Set up HopDNS on your computer and connect your console.">
   <title>HopDNS setup guide</title>
   <link rel="stylesheet" href="guide.css">
+  <script src="guide.js" defer></script>
 </head>
 <body>
   <header>
@@ -17,22 +18,88 @@
       <div>
         <h1>Connect your console with HopDNS</h1>
         <p>HopDNS lets supported web connections from your console go through a computer on your home network. It runs on Windows, macOS, and Linux and opens its settings in your browser.</p>
-        <a class="download" href="https://github.com/mkay1375/hopdns/releases/latest">Download HopDNS</a>
-        <p>Under <strong>Assets</strong>, choose the archive for your computer. You can download without a GitHub account. Apple Silicon Macs use <code>darwin-arm64</code>. Most Windows PCs use <code>windows-amd64</code>.</p>
+        <a class="download" href="#downloads">Find my download</a>
       </div>
       <figure>
         <a href="desktop.png"><img src="desktop.png" alt="HopDNS browser panel showing connection counts and a traffic chart"></a>
         <figcaption>HopDNS browser panel with sample traffic</figcaption>
       </figure>
     </section>
+    <section id="downloads" class="instructions" aria-labelledby="downloads-title">
+      <h2 id="downloads-title">Download for your computer</h2>
+      <p>Choose the computer that will run HopDNS. Downloads are free. You can use HopDNS without a GitHub account or Docker.</p>
+      <div class="platform-tabs" hidden>
+        <button type="button" id="tab-windows" data-platform="windows">Windows</button>
+        <button type="button" id="tab-macos" data-platform="macos">macOS</button>
+        <button type="button" id="tab-linux" data-platform="linux">Linux</button>
+      </div>
+      <section class="platform" id="windows">
+        <h3>Windows</h3>
+        <p>Open <strong>Settings → System → About</strong> and look for <strong>System type</strong>.</p>
+        <div class="download-links">
+          <a class="download" href="https://github.com/mkay1375/hopdns/releases/latest/download/hopdns-windows-amd64.zip">Windows for Intel or AMD (x64)</a>
+          <a class="download" href="https://github.com/mkay1375/hopdns/releases/latest/download/hopdns-windows-arm64.zip">Windows for ARM (ARM64)</a>
+        </div>
+        <p>Right-click the downloaded ZIP and choose <strong>Extract All</strong>. Open the folder containing <code>hopdns.exe</code>, click the folder address bar, type <code>powershell</code>, and press Enter.</p>
+        <p>Find your address in <strong>Settings → Network &amp; internet</strong>. Open your Wi-Fi network’s properties or select <strong>Ethernet</strong>, then look for <strong>IPv4 address</strong>.</p>
+        <p>Both devices should be on your regular home network. Copy this command, replace <code>192.168.1.20</code> with your own address, then press Enter in the terminal.</p>
+        <pre dir="ltr"><code>.\hopdns.exe --traffic-bind 192.168.1.20</code></pre>
+      </section>
+      <section class="platform" id="macos">
+        <h3>macOS</h3>
+        <p>Open the Apple menu  → <strong>About This Mac</strong>. Choose Apple silicon if <strong>Chip</strong> says Apple, or Intel if <strong>Processor</strong> says Intel.</p>
+        <div class="download-links">
+          <a class="download" href="https://github.com/mkay1375/hopdns/releases/latest/download/hopdns-darwin-arm64.tar.gz">Mac with Apple silicon</a>
+          <a class="download" href="https://github.com/mkay1375/hopdns/releases/latest/download/hopdns-darwin-amd64.tar.gz">Mac with Intel</a>
+        </div>
+        <p>Double-click the download to unpack it. Open <strong>Terminal</strong>, type <code>cd</code> followed by a space, drag in the folder containing <code>hopdns</code>, and press Return.</p>
+        <p>Find your address in <strong>System Settings → Network</strong>. Choose the active Wi-Fi or Ethernet connection, then <strong>Details → TCP/IP</strong>. Look for <strong>IP address</strong>.</p>
+        <p>Both devices should be on your regular home network. Copy this command, replace <code>192.168.1.20</code> with your own address, then press Enter in the terminal.</p>
+        <pre dir="ltr"><code>./hopdns --traffic-bind 192.168.1.20</code></pre>
+      </section>
+      <section class="platform" id="linux">
+        <h3>Linux</h3>
+        <p>Open Terminal and run <code>uname -m</code>. Choose the download that matches the result.</p>
+        <div class="download-links">
+          <a class="download" href="https://github.com/mkay1375/hopdns/releases/latest/download/hopdns-linux-amd64.tar.gz">Linux for Intel or AMD (x86_64)</a>
+          <a class="download" href="https://github.com/mkay1375/hopdns/releases/latest/download/hopdns-linux-arm64.tar.gz">Linux for ARM (aarch64)</a>
+        </div>
+        <p>Right-click the download and choose <strong>Extract Here</strong> or <strong>Extract To</strong>. Open the folder containing <code>hopdns</code> in Terminal. Many file managers have an <strong>Open in Terminal</strong> option when you right-click the folder.</p>
+        <p>In your network settings, open the details for the active Wi-Fi or wired connection and look for <strong>IPv4 address</strong>.</p>
+        <p>Both devices should be on your regular home network. Copy this command, replace <code>192.168.1.20</code> with your own address, then press Enter in the terminal.</p>
+        <pre dir="ltr"><code>./hopdns --traffic-bind 192.168.1.20</code></pre>
+      </section>
+    </section>
     <section class="instructions">
-      <h2>Set up your console</h2>
+      <h2>Connect your Xbox or PlayStation</h2>
       <ol>
-        <li><strong>Connect both devices to your home network.</strong> Find your computer’s local IPv4 address in its network settings. It often starts with <code>192.168.</code></li>
-        <li><strong>Extract the download and start HopDNS.</strong> Open Terminal in the extracted folder. On Mac or Linux, run <code>./hopdns --traffic-bind 192.168.1.20 --public-ip 192.168.1.20</code>. In Windows PowerShell, use <code>.\hopdns.exe</code> in place of <code>./hopdns</code>. Replace both example addresses with your own.</li>
-        <li><strong>Open the panel.</strong> If the browser does not open, visit <a href="http://localhost:48741">localhost:48741</a> on your computer. Keep HopDNS running. If it reports a permissions or port error, see the <a href="https://github.com/mkay1375/hopdns/blob/main/docs/reference.md#native-application">native setup reference</a>.</li>
-        <li><strong>Set your console’s DNS manually.</strong> Use the same IPv4 address as primary DNS and run the console’s network test. To undo the change, set DNS back to <strong>Automatic</strong>.</li>
+        <li><strong>Save in the HopDNS panel.</strong> If your browser doesn’t open, go to <a href="http://localhost:48741">localhost:48741</a> on the computer running HopDNS. Under <strong>Reachable IPv4 address</strong>, enter the same address you used in the command. Choose <strong>Selected domains</strong>, keep the suggested console sites or add your own (one name per line, like <code>example.com</code>), and click <strong>Save routing</strong>.</li>
+        <li><strong>Change DNS on your console.</strong> On Xbox, go to <strong>Settings → General → Network settings → Advanced settings → DNS settings → Manual</strong>. On PS5, open your connection’s <strong>Advanced Settings</strong>. On PS4, choose <strong>Custom</strong> during network setup. Under <strong>DNS Settings</strong>, choose <strong>Manual</strong> and enter the computer’s address as <strong>Primary DNS</strong>. If the console requires a <strong>Secondary DNS</strong>, try the same address there too. Using a different DNS server can send some requests around HopDNS. <a href="https://www.playstation.com/en-us/support/connectivity/internet-connect-playstation/">PlayStation network setup</a></li>
+        <li><strong>Check the connection.</strong> Run the console’s network test and look for <strong>DNS queries</strong> to increase in the HopDNS panel. Keep the computer awake and the terminal open while using HopDNS. To go back to your usual connection, set the console’s DNS to <strong>Automatic</strong>.</li>
       </ol>
+    </section>
+    <section class="instructions">
+      <h2>If your console can’t connect</h2>
+      <details>
+        <summary>Check your computer’s firewall</summary>
+        <ul>
+          <li><strong>Windows:</strong> If Windows asks to let HopDNS through the firewall, allow it on <strong>Private networks</strong> only. If you missed the prompt, open <strong>Windows Security → Firewall &amp; network protection → Allow an app through firewall</strong> and choose the extracted <code>hopdns.exe</code>. If Windows lists your trusted home Wi-Fi as Public, change the network profile to Private in that connection’s settings. <a href="https://support.microsoft.com/en-us/windows/security/windows-security/firewall-and-network-protection-in-the-windows-security-app">Microsoft firewall help</a></li>
+          <li><strong>Mac:</strong> If macOS asks whether HopDNS can accept incoming connections, choose <strong>Allow</strong>. To check later, go to <strong>System Settings → Network → Firewall → Options</strong> and allow incoming connections for <code>hopdns</code>. <a href="https://support.apple.com/guide/mac-help/mh11783/mac">Apple firewall help</a></li>
+          <li><strong>Linux:</strong> If a firewall is enabled, allow incoming traffic from your console’s local address on port <code>53</code> (TCP and UDP) and ports <code>80</code> and <code>443</code> (TCP). The steps depend on your Linux version. <a href="https://documentation.ubuntu.com/security/security-features/network/firewall/">Ubuntu firewall help</a></li>
+        </ul>
+        <p>Keep the firewall on. For a console on your home network, you can leave your router’s port-forwarding settings alone.</p>
+      </details>
+      <details>
+        <summary>Check the network and address</summary>
+        <p>Use your regular home Wi-Fi or a cable connected to the same router. Guest Wi-Fi often keeps devices from reaching each other. Your computer’s address can change after a restart or a switch between Wi-Fi and Ethernet. If it changed, start HopDNS with the new address, update it in the panel, and enter it again on the console.</p>
+      </details>
+      <details>
+        <summary>Read the error message in the terminal</summary>
+        <ul>
+          <li><strong>Address already in use:</strong> Close any earlier copy of HopDNS, including a copy running in Docker, then try again.</li>
+          <li><strong>Permission denied on Mac or Linux:</strong> If the relay can’t open a network port, follow the administrator startup steps in the <a href="https://github.com/mkay1375/hopdns/blob/main/docs/reference.md#native-application">technical guide</a>.</li>
+        </ul>
+      </details>
     </section>
     <p class="note">HopDNS handles compatible web connections. Online gameplay that uses UDP follows the console’s normal network route.</p>
   </main>
