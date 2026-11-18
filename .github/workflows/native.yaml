@@ -92,7 +92,10 @@ jobs:
           npm install --prefix "$RUNNER_TEMP/hopdns-playwright" playwright@1.65.1
           "$RUNNER_TEMP/hopdns-playwright/node_modules/.bin/playwright" install --with-deps chromium
           mkdir -p "$RUNNER_TEMP/hopdns-ui" "$RUNNER_TEMP/hopdns-ui-settings"
-          ./dist/hopdns --no-browser --panel 127.0.0.1:48841 --data-dir "$RUNNER_TEMP/hopdns-ui-settings" > "$RUNNER_TEMP/hopdns-ui/terminal.log" 2>&1 &
+          ./dist/hopdns --no-browser --panel 127.0.0.1:48841 \
+            --traffic-bind 127.0.0.1 --public-ip 127.0.0.1 \
+            --dns-port 1053 --http-port 1080 --https-port 1443 \
+            --data-dir "$RUNNER_TEMP/hopdns-ui-settings" > "$RUNNER_TEMP/hopdns-ui/terminal.log" 2>&1 &
           app_pid=$!
           trap 'kill "$app_pid" 2>/dev/null || true; wait "$app_pid" || true' EXIT
           for attempt in $(seq 1 30); do
