@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Set up HopDNS on your computer and connect your console.">
   <title>HopDNS setup guide</title>
-  <link rel="stylesheet" href="guide.css?v=5698aaf0e59d">
-  <script src="guide.js?v=808903ee39ad" defer></script>
+  <link rel="stylesheet" href="guide.css?v=ba99046b7f88">
+  <script src="guide.js?v=e917b4716e81" defer></script>
 </head>
 <body>
   <header>
@@ -28,12 +28,12 @@
     <div class="setup">
       <section id="downloads" class="instructions" aria-labelledby="downloads-title">
         <h2 id="downloads-title">Download for your computer</h2>
-        <div class="platform-tabs" hidden>
-          <button type="button" id="tab-windows" data-platform="windows">Windows</button>
-          <button type="button" id="tab-macos" data-platform="macos">macOS</button>
-          <button type="button" id="tab-linux" data-platform="linux">Linux</button>
+        <div id="platform-tabs" class="guide-tabs" aria-labelledby="downloads-title" hidden>
+          <button type="button" id="tab-windows" data-panel="windows">Windows</button>
+          <button type="button" id="tab-macos" data-panel="macos">macOS</button>
+          <button type="button" id="tab-linux" data-panel="linux">Linux</button>
         </div>
-        <section class="platform" id="windows">
+        <section class="guide-panel platform" id="windows">
           <h3>Windows</h3>
           <p>Open <strong>Settings → System → About</strong> and look for <strong>System type</strong>.</p>
           <div class="download-links">
@@ -45,7 +45,7 @@
           <p>Both devices should be on your regular home network. Copy this command, replace <code>192.168.1.20</code> with your own address, then press Enter in the terminal.</p>
           <pre dir="ltr"><code>.\hopdns.exe --traffic-bind 192.168.1.20</code></pre>
         </section>
-        <section class="platform" id="macos">
+        <section class="guide-panel platform" id="macos">
           <h3>macOS</h3>
           <p>Open the Apple menu → <strong>About This Mac</strong>. Choose Apple silicon if <strong>Chip</strong> says Apple, or Intel if <strong>Processor</strong> says Intel.</p>
           <div class="download-links">
@@ -57,7 +57,7 @@
           <p>Both devices should be on your regular home network. Copy this command, replace <code>192.168.1.20</code> with your own address, then press Enter in the terminal.</p>
           <pre dir="ltr"><code>./hopdns --traffic-bind 192.168.1.20</code></pre>
         </section>
-        <section class="platform" id="linux">
+        <section class="guide-panel platform" id="linux">
           <h3>Linux</h3>
           <p>Open Terminal and run <code>uname -m</code>. Choose the download that matches the result.</p>
           <div class="download-links">
@@ -74,7 +74,23 @@
         <h2>Connect your Xbox or PlayStation</h2>
         <ol>
           <li><strong>Save in the HopDNS panel.</strong> If your browser doesn’t open, go to <a href="http://localhost:48741">localhost:48741</a> on the computer running HopDNS. Under <strong>Reachable IPv4 address</strong>, enter the same address you used in the command. Choose <strong>Selected domains</strong>, keep the suggested console sites or add your own (one name per line, like <code>example.com</code>), and click <strong>Save routing</strong>.</li>
-          <li><strong>Change DNS on your console.</strong> On Xbox, go to <strong>Settings → General → Network settings → Advanced settings → DNS settings → Manual</strong>. On PS5, open your connection’s <strong>Advanced Settings</strong>. On PS4, choose <strong>Custom</strong> during network setup. Under <strong>DNS Settings</strong>, choose <strong>Manual</strong> and enter the computer’s address as <strong>Primary DNS</strong>. If the console requires a <strong>Secondary DNS</strong>, try the same address there too. Using a different DNS server can send some requests around HopDNS. <a href="https://www.playstation.com/en-us/support/connectivity/internet-connect-playstation/">PlayStation network setup</a></li>
+          <li>
+            <strong id="console-dns-title">Change DNS on your console.</strong>
+            <div id="console-tabs" class="guide-tabs console-tabs" aria-labelledby="console-dns-title" hidden>
+              <button type="button" id="tab-xbox" data-panel="xbox">Xbox</button>
+              <button type="button" id="tab-playstation" data-panel="playstation">PlayStation</button>
+            </div>
+            <section class="guide-panel" id="xbox">
+              <h3>Xbox</h3>
+              <p>Go to <strong>Settings → General → Network settings → Advanced settings → DNS settings → Manual</strong>.</p>
+            </section>
+            <section class="guide-panel" id="playstation">
+              <h3>PlayStation</h3>
+              <p>On <strong>PS5</strong>, open your connection’s <strong>Advanced Settings</strong>. On <strong>PS4</strong>, choose <strong>Custom</strong> during network setup. Under <strong>DNS Settings</strong>, choose <strong>Manual</strong>.</p>
+              <p><a href="https://www.playstation.com/en-us/support/connectivity/internet-connect-playstation/">PlayStation network setup</a></p>
+            </section>
+            <p>Enter your computer’s address as <strong>Primary DNS</strong>. If the console requires a <strong>Secondary DNS</strong>, try the same address there too. A different DNS server can send some requests around HopDNS.</p>
+          </li>
           <li><strong>Check the connection.</strong> Run the console’s network test and look for <strong>DNS queries</strong> to increase in the HopDNS panel. Keep the computer awake and the terminal open while using HopDNS. To go back to your usual connection, set the console’s DNS to <strong>Automatic</strong>.</li>
         </ol>
       </section>

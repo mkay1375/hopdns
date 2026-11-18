@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="راهنمای سادهٔ راه‌اندازی HopDNS روی رایانه و اتصال کنسول">
   <title>راهنمای راه‌اندازی HopDNS</title>
-  <link rel="stylesheet" href="../guide.css?v=5698aaf0e59d">
-  <script src="../guide.js?v=808903ee39ad" defer></script>
+  <link rel="stylesheet" href="../guide.css?v=ba99046b7f88">
+  <script src="../guide.js?v=e917b4716e81" defer></script>
 </head>
 <body>
   <header>
@@ -28,12 +28,12 @@
     <div class="setup">
       <section id="downloads" class="instructions" aria-labelledby="downloads-title">
         <h2 id="downloads-title">دانلود برای رایانه</h2>
-        <div class="platform-tabs" hidden>
-          <button type="button" id="tab-windows" data-platform="windows">ویندوز</button>
-          <button type="button" id="tab-macos" data-platform="macos">مک</button>
-          <button type="button" id="tab-linux" data-platform="linux">لینوکس</button>
+        <div id="platform-tabs" class="guide-tabs" aria-labelledby="downloads-title" hidden>
+          <button type="button" id="tab-windows" data-panel="windows">ویندوز</button>
+          <button type="button" id="tab-macos" data-panel="macos">مک</button>
+          <button type="button" id="tab-linux" data-panel="linux">لینوکس</button>
         </div>
-        <section class="platform" id="windows">
+        <section class="guide-panel platform" id="windows">
           <h3>ویندوز</h3>
           <p>به <bdi><strong>Settings → System → About</strong></bdi> بروید و نوع سیستم را در بخش <bdi><strong>System type</strong></bdi> ببینید.</p>
           <div class="download-links">
@@ -45,7 +45,7 @@
           <p>رایانه و کنسول را به شبکهٔ خانگی وصل کنید. فرمان زیر را کپی کنید، به‌جای <code>192.168.1.20</code> نشانی رایانهٔ خودتان را بنویسید و در ترمینال کلید <bdi>Enter</bdi> را بزنید.</p>
           <pre dir="ltr"><code>.\hopdns.exe --traffic-bind 192.168.1.20</code></pre>
         </section>
-        <section class="platform" id="macos">
+        <section class="guide-panel platform" id="macos">
           <h3>مک</h3>
           <p>از منوی اپل، <bdi><strong>About This Mac</strong></bdi> را باز کنید. اگر جلوی <bdi><strong>Chip</strong></bdi> نام تراشهٔ اپل است، نسخهٔ اپل را بگیرید. اگر جلوی <bdi><strong>Processor</strong></bdi> نام اینتل است، نسخهٔ اینتل را بگیرید.</p>
           <div class="download-links">
@@ -57,7 +57,7 @@
           <p>رایانه و کنسول را به شبکهٔ خانگی وصل کنید. فرمان زیر را کپی کنید، به‌جای <code>192.168.1.20</code> نشانی رایانهٔ خودتان را بنویسید و در ترمینال کلید <bdi>Enter</bdi> را بزنید.</p>
           <pre dir="ltr"><code>./hopdns --traffic-bind 192.168.1.20</code></pre>
         </section>
-        <section class="platform" id="linux">
+        <section class="guide-panel platform" id="linux">
           <h3>لینوکس</h3>
           <p>در ترمینال <code>uname -m</code> را اجرا کنید و نسخه‌ای را بگیرید که با نتیجه مطابقت دارد.</p>
           <div class="download-links">
@@ -74,7 +74,23 @@
         <h2>اتصال ایکس‌باکس یا پلی‌استیشن</h2>
         <ol>
           <li><strong>تنظیمات را در پنل ذخیره کنید.</strong> اگر مرورگر خودکار باز نشد، در همان رایانه به <a href="http://localhost:48741" dir="ltr">localhost:48741</a> بروید. در کادر <bdi><strong>Reachable IPv4 address</strong></bdi> همان نشانی را که در فرمان نوشتید وارد کنید. <bdi><strong>Selected domains</strong></bdi> را انتخاب کنید، نشانی‌های پیشنهادی را نگه دارید یا نام سایت دلخواهتان را اضافه کنید (هر نام در یک خط، مثلاً <code>example.com</code>) و <bdi><strong>Save routing</strong></bdi> را بزنید.</li>
-          <li><strong><bdi>DNS</bdi> کنسول را تغییر دهید.</strong> در ایکس‌باکس به <bdi><strong>Settings → General → Network settings → Advanced settings → DNS settings → Manual</strong></bdi> بروید. در <bdi>PS5</bdi> بخش <bdi><strong>Advanced Settings</strong></bdi> اتصال را باز کنید. در <bdi>PS4</bdi> هنگام راه‌اندازی شبکه، <bdi><strong>Custom</strong></bdi> را بزنید. در تنظیمات <bdi>DNS</bdi> گزینهٔ <bdi><strong>Manual</strong></bdi> را انتخاب کنید و نشانی رایانه را در <bdi><strong>Primary DNS</strong></bdi> وارد کنید. اگر کنسول <bdi><strong>Secondary DNS</strong></bdi> هم می‌خواهد، همان نشانی را امتحان کنید. وارد کردن یک نشانی متفاوت ممکن است باعث شود بعضی درخواست‌ها از برنامه عبور نکنند. <a href="https://www.playstation.com/en-us/support/connectivity/internet-connect-playstation/">راهنمای اتصال پلی‌استیشن (انگلیسی)</a></li>
+          <li>
+            <strong id="console-dns-title"><bdi>DNS</bdi> کنسول را تغییر دهید.</strong>
+            <div id="console-tabs" class="guide-tabs console-tabs" aria-labelledby="console-dns-title" hidden>
+              <button type="button" id="tab-xbox" data-panel="xbox">ایکس‌باکس</button>
+              <button type="button" id="tab-playstation" data-panel="playstation">پلی‌استیشن</button>
+            </div>
+            <section class="guide-panel" id="xbox">
+              <h3>ایکس‌باکس</h3>
+              <p>به <bdi><strong>Settings → General → Network settings → Advanced settings → DNS settings → Manual</strong></bdi> بروید.</p>
+            </section>
+            <section class="guide-panel" id="playstation">
+              <h3>پلی‌استیشن</h3>
+              <p>در <bdi><strong>PS5</strong></bdi> بخش <bdi><strong>Advanced Settings</strong></bdi> اتصال را باز کنید. در <bdi><strong>PS4</strong></bdi> هنگام راه‌اندازی شبکه، <bdi><strong>Custom</strong></bdi> را بزنید. در بخش <bdi><strong>DNS Settings</strong></bdi> گزینهٔ <bdi><strong>Manual</strong></bdi> را بزنید.</p>
+              <p><a href="https://www.playstation.com/en-us/support/connectivity/internet-connect-playstation/">راهنمای اتصال پلی‌استیشن (انگلیسی)</a></p>
+            </section>
+            <p>نشانی رایانه را در <bdi><strong>Primary DNS</strong></bdi> وارد کنید. اگر کنسول <bdi><strong>Secondary DNS</strong></bdi> هم می‌خواهد، همان نشانی را امتحان کنید. با وارد کردن نشانی دیگری، ممکن است بعضی درخواست‌ها از برنامه عبور نکنند.</p>
+          </li>
           <li><strong>اتصال را بررسی کنید.</strong> آزمون اتصال کنسول را اجرا کنید و ببینید عدد <bdi><strong>DNS queries</strong></bdi> در پنل بالا می‌رود یا نه. تا وقتی از برنامه استفاده می‌کنید، پنجرهٔ ترمینال را باز نگه دارید و نگذارید رایانه به حالت خواب برود. برای برگشت به اتصال عادی، <bdi>DNS</bdi> کنسول را روی <bdi><strong>Automatic</strong></bdi> بگذارید.</li>
         </ol>
       </section>
