@@ -12,12 +12,16 @@ Manage it from your browser.
 
 ## Get started
 
-**Native app.** Download the archive for your OS and processor under **Assets**
+### Native app
+
+Download the archive for your OS and processor under **Assets**
 on the [latest release](https://github.com/mkay1375/hopdns/releases/latest). No GitHub account is needed.
 Extract it and run `./hopdns` in Terminal or `.\hopdns.exe` in PowerShell.
 The app opens your browser at [localhost:48741](http://localhost:48741).
 
-**Docker.** Download the [Compose file](https://raw.githubusercontent.com/mkay1375/hopdns/main/compose.yaml) as `compose.yaml`, then run
+### Docker
+
+Download the [Compose file](https://raw.githubusercontent.com/mkay1375/hopdns/main/compose.yaml) as `compose.yaml`, then run
 these commands from its folder:
 
 ```sh
@@ -30,9 +34,10 @@ Open [localhost:48741](http://localhost:48741) to configure it.
 
 ## Connect a device
 
-1. Follow the [LAN setup for your install](docs/reference.md#laptop-lan-and-server-deployment).
-2. Enter the computer's LAN IPv4 address in the panel and save your routing rules.
-3. Set the device's manual DNS to that address. Keep HopDNS running while connected.
+In the native app, copy the address shown under **Connect a device** in the
+panel. For Docker, follow the [LAN setup](docs/reference.md#laptop-lan-and-server-deployment)
+to set that address. Enter it as the console’s manual DNS and keep HopDNS running
+while connected.
 
 HopDNS relays supported HTTP and HTTPS traffic. UDP gameplay and direct IP
 connections follow the device's normal route. [Routing details](docs/reference.md#what-routing-means)

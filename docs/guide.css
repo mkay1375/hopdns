@@ -40,7 +40,7 @@ figcaption { color: #445971; font-size: .9rem; margin-block-start: .5rem; }
 .guide-tabs button { padding: .65rem .85rem; border: 0; border-block-end: 3px solid transparent; background: transparent; color: inherit; font: inherit; cursor: pointer; }
 .guide-tabs button[aria-selected="true"] { border-block-end-color: var(--accent); color: var(--accent); font-weight: 700; }
 .guide-tabs button:focus-visible, [role="tabpanel"]:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
-.console-tabs { margin-block-start: .5rem; }
+.nested-tabs { margin-block-start: .5rem; }
 .platform { margin-block-start: 1.15rem; }
 .guide-panel[role="tabpanel"] > h3 { display: none; }
 .download-links { display: flex; flex-wrap: wrap; gap: .55rem; }
@@ -55,6 +55,7 @@ details { border-block-start: 1px solid var(--line); padding-block: .7rem; }
 details:last-child { padding-block-end: 0; }
 summary { font-weight: 650; cursor: pointer; }
 .note { margin-block-start: 1.5rem; border-inline-start: .2rem solid var(--accent); padding-inline-start: 1rem; }
+.troubleshooting :is(p, li), .note { max-inline-size: none; }
 @media (max-width: 900px) {
   .setup { grid-template-columns: 1fr; }
 }

@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="راهنمای سادهٔ راه‌اندازی HopDNS روی رایانه و اتصال کنسول">
   <title>راهنمای راه‌اندازی HopDNS</title>
-  <link rel="stylesheet" href="../guide.css?v=ba99046b7f88">
-  <script src="../guide.js?v=e917b4716e81" defer></script>
+  <link rel="stylesheet" href="../guide.css?v=ce3267bba0e4">
+  <script src="../guide.js?v=697a30c39180" defer></script>
 </head>
 <body>
   <header>
@@ -40,10 +40,7 @@
             <a class="download" href="https://github.com/mkay1375/hopdns/releases/latest/download/hopdns-windows-amd64.zip">ویندوز برای اینتل یا AMD (x64)</a>
             <a class="download" href="https://github.com/mkay1375/hopdns/releases/latest/download/hopdns-windows-arm64.zip">ویندوز برای ARM (ARM64)</a>
           </div>
-          <p>روی فایل <bdi>ZIP</bdi> راست‌کلیک کنید و <bdi><strong>Extract All</strong></bdi> را بزنید. پوشه‌ای را که فایل <code>hopdns.exe</code> در آن است باز کنید، در نوار نشانی پوشه <code>powershell</code> بنویسید و کلید <bdi>Enter</bdi> را بزنید.</p>
-          <p>به <bdi><strong>Settings → Network &amp; internet</strong></bdi> بروید. مشخصات وای‌فای فعلی را باز کنید یا <bdi><strong>Ethernet</strong></bdi> را انتخاب کنید. نشانی را کنار <bdi><strong>IPv4 address</strong></bdi> می‌بینید.</p>
-          <p>رایانه و کنسول را به شبکهٔ خانگی وصل کنید. فرمان زیر را کپی کنید، به‌جای <code>192.168.1.20</code> نشانی رایانهٔ خودتان را بنویسید و در ترمینال کلید <bdi>Enter</bdi> را بزنید.</p>
-          <pre dir="ltr"><code>.\hopdns.exe --traffic-bind 192.168.1.20</code></pre>
+          <p>روی فایل <bdi>ZIP</bdi> راست‌کلیک کنید و <bdi><strong>Extract All</strong></bdi> را بزنید. پوشهٔ استخراج‌شده را باز کنید و روی <code>hopdns.exe</code> دوبار کلیک کنید.</p>
         </section>
         <section class="guide-panel platform" id="macos">
           <h3>مک</h3>
@@ -53,9 +50,7 @@
             <a class="download" href="https://github.com/mkay1375/hopdns/releases/latest/download/hopdns-darwin-amd64.tar.gz">مک با پردازندهٔ اینتل</a>
           </div>
           <p>روی فایل دانلودشده دوبار کلیک کنید تا از حالت فشرده خارج شود. <bdi><strong>Terminal</strong></bdi> را باز کنید، <code>cd</code> و یک فاصله بزنید، پوشهٔ حاوی فایل <code>hopdns</code> را به پنجرهٔ ترمینال بکشید و کلید <bdi>Return</bdi> را بزنید.</p>
-          <p>به <bdi><strong>System Settings → Network</strong></bdi> بروید و اتصال فعال وای‌فای یا کابل را انتخاب کنید. در <bdi><strong>Details → TCP/IP</strong></bdi>، نشانی را کنار <bdi><strong>IP address</strong></bdi> ببینید.</p>
-          <p>رایانه و کنسول را به شبکهٔ خانگی وصل کنید. فرمان زیر را کپی کنید، به‌جای <code>192.168.1.20</code> نشانی رایانهٔ خودتان را بنویسید و در ترمینال کلید <bdi>Enter</bdi> را بزنید.</p>
-          <pre dir="ltr"><code>./hopdns --traffic-bind 192.168.1.20</code></pre>
+          <p>فرمان <code>./hopdns</code> را بنویسید و کلید <bdi>Enter</bdi> را بزنید.</p>
         </section>
         <section class="guide-panel platform" id="linux">
           <h3>لینوکس</h3>
@@ -65,18 +60,16 @@
             <a class="download" href="https://github.com/mkay1375/hopdns/releases/latest/download/hopdns-linux-arm64.tar.gz">لینوکس برای ARM (aarch64)</a>
           </div>
           <p>روی فایل دانلودشده راست‌کلیک کنید و <bdi><strong>Extract Here</strong></bdi> یا <bdi><strong>Extract To</strong></bdi> را بزنید. پوشهٔ حاوی فایل <code>hopdns</code> را در ترمینال باز کنید. در بسیاری از برنامه‌های مدیریت فایل، با راست‌کلیک روی پوشه گزینهٔ <bdi><strong>Open in Terminal</strong></bdi> را می‌بینید.</p>
-          <p>در تنظیمات شبکه، جزئیات اتصال فعال وای‌فای یا کابل را باز کنید و دنبال <bdi><strong>IPv4 address</strong></bdi> بگردید.</p>
-          <p>رایانه و کنسول را به شبکهٔ خانگی وصل کنید. فرمان زیر را کپی کنید، به‌جای <code>192.168.1.20</code> نشانی رایانهٔ خودتان را بنویسید و در ترمینال کلید <bdi>Enter</bdi> را بزنید.</p>
-          <pre dir="ltr"><code>./hopdns --traffic-bind 192.168.1.20</code></pre>
+          <p>فرمان <code>./hopdns</code> را بنویسید و کلید <bdi>Enter</bdi> را بزنید.</p>
         </section>
       </section>
       <section class="instructions">
         <h2>اتصال ایکس‌باکس یا پلی‌استیشن</h2>
         <ol>
-          <li><strong>تنظیمات را در پنل ذخیره کنید.</strong> اگر مرورگر خودکار باز نشد، در همان رایانه به <a href="http://localhost:48741" dir="ltr">localhost:48741</a> بروید. در کادر <bdi><strong>Reachable IPv4 address</strong></bdi> همان نشانی را که در فرمان نوشتید وارد کنید. <bdi><strong>Selected domains</strong></bdi> را انتخاب کنید، نشانی‌های پیشنهادی را نگه دارید یا نام سایت دلخواهتان را اضافه کنید (هر نام در یک خط، مثلاً <code>example.com</code>) و <bdi><strong>Save routing</strong></bdi> را بزنید.</li>
+          <li><strong>نشانی <bdi>DNS</bdi> را از پنل کپی کنید.</strong> رایانه و کنسول را به یک شبکهٔ خانگی وصل کنید. اگر پنل خودکار باز نشد، در رایانه‌ای که <bdi>HopDNS</bdi> روی آن اجراست به <a href="http://localhost:48741/#connect" dir="ltr">localhost:48741</a> بروید. بخش <bdi><strong>Connect a device</strong></bdi> را باز کنید و نشانی نمایش‌داده‌شده را کپی کنید.</li>
           <li>
             <strong id="console-dns-title"><bdi>DNS</bdi> کنسول را تغییر دهید.</strong>
-            <div id="console-tabs" class="guide-tabs console-tabs" aria-labelledby="console-dns-title" hidden>
+            <div id="console-tabs" class="guide-tabs nested-tabs" aria-labelledby="console-dns-title" hidden>
               <button type="button" id="tab-xbox" data-panel="xbox">ایکس‌باکس</button>
               <button type="button" id="tab-playstation" data-panel="playstation">پلی‌استیشن</button>
             </div>
@@ -89,26 +82,39 @@
               <p>در <bdi><strong>PS5</strong></bdi> بخش <bdi><strong>Advanced Settings</strong></bdi> اتصال را باز کنید. در <bdi><strong>PS4</strong></bdi> هنگام راه‌اندازی شبکه، <bdi><strong>Custom</strong></bdi> را بزنید. در بخش <bdi><strong>DNS Settings</strong></bdi> گزینهٔ <bdi><strong>Manual</strong></bdi> را بزنید.</p>
               <p><a href="https://www.playstation.com/en-us/support/connectivity/internet-connect-playstation/">راهنمای اتصال پلی‌استیشن (انگلیسی)</a></p>
             </section>
-            <p>نشانی رایانه را در <bdi><strong>Primary DNS</strong></bdi> وارد کنید. اگر کنسول <bdi><strong>Secondary DNS</strong></bdi> هم می‌خواهد، همان نشانی را امتحان کنید. با وارد کردن نشانی دیگری، ممکن است بعضی درخواست‌ها از برنامه عبور نکنند.</p>
+            <p>نشانی‌ای را که کپی کردید در <bdi><strong>Primary DNS</strong></bdi> وارد کنید. اگر کنسول <bdi><strong>Secondary DNS</strong></bdi> هم می‌خواهد، همان نشانی را امتحان کنید. با وارد کردن نشانی دیگری، ممکن است بعضی درخواست‌ها از برنامه عبور نکنند.</p>
           </li>
           <li><strong>اتصال را بررسی کنید.</strong> آزمون اتصال کنسول را اجرا کنید و ببینید عدد <bdi><strong>DNS queries</strong></bdi> در پنل بالا می‌رود یا نه. تا وقتی از برنامه استفاده می‌کنید، پنجرهٔ ترمینال را باز نگه دارید و نگذارید رایانه به حالت خواب برود. برای برگشت به اتصال عادی، <bdi>DNS</bdi> کنسول را روی <bdi><strong>Automatic</strong></bdi> بگذارید.</li>
         </ol>
       </section>
     </div>
-    <section class="instructions">
+    <section class="instructions troubleshooting">
       <h2>اگر کنسول وصل نمی‌شود</h2>
       <details>
-        <summary>فایروال رایانه را بررسی کنید</summary>
-        <ul>
-          <li><strong>ویندوز.</strong> اگر ویندوز برای <bdi>HopDNS</bdi> اجازهٔ دسترسی خواست، فقط <bdi><strong>Private networks</strong></bdi> را انتخاب کنید. اگر پیام را رد کردید، به <bdi><strong>Windows Security → Firewall &amp; network protection → Allow an app through firewall</strong></bdi> بروید و فایل <code>hopdns.exe</code> را انتخاب کنید. اگر وای‌فای مطمئن خانه در ویندوز <bdi>Public</bdi> است، در تنظیمات همان اتصال آن را روی <bdi>Private</bdi> بگذارید. <a href="https://support.microsoft.com/en-us/windows/security/windows-security/firewall-and-network-protection-in-the-windows-security-app">راهنمای فایروال مایکروسافت (انگلیسی)</a></li>
-          <li><strong>مک.</strong> اگر مک برای اتصال‌های ورودی <bdi>HopDNS</bdi> اجازه خواست، <bdi><strong>Allow</strong></bdi> را بزنید. برای بررسی دوباره، به <bdi><strong>System Settings → Network → Firewall → Options</strong></bdi> بروید و به <code>hopdns</code> اجازهٔ دریافت اتصال بدهید. <a href="https://support.apple.com/guide/mac-help/mh11783/mac">راهنمای فایروال اپل (انگلیسی)</a></li>
-          <li><strong>لینوکس.</strong> اگر فایروال فعال است، اجازه دهید فقط نشانی محلی کنسول به پورت <code>53</code> (هم <bdi>TCP</bdi> و هم <bdi>UDP</bdi>) و پورت‌های <code>80</code> و <code>443</code> (با <bdi>TCP</bdi>) وصل شود. روش انجام این کار به نسخهٔ لینوکس بستگی دارد. <a href="https://documentation.ubuntu.com/security/security-features/network/firewall/">راهنمای فایروال اوبونتو (انگلیسی)</a></li>
-        </ul>
+        <summary id="firewall-title">فایروال رایانه را بررسی کنید</summary>
+        <div id="firewall-tabs" class="guide-tabs nested-tabs" aria-labelledby="firewall-title" hidden>
+          <button type="button" id="tab-firewall-windows" data-panel="firewall-windows">ویندوز</button>
+          <button type="button" id="tab-firewall-macos" data-panel="firewall-macos">مک</button>
+          <button type="button" id="tab-firewall-linux" data-panel="firewall-linux">لینوکس</button>
+        </div>
+        <section class="guide-panel" id="firewall-windows">
+          <h3>ویندوز</h3>
+          <p>اگر ویندوز برای <bdi>HopDNS</bdi> اجازهٔ دسترسی خواست، فقط <bdi><strong>Private networks</strong></bdi> را انتخاب کنید. اگر پیام را رد کردید، به <bdi><strong>Windows Security → Firewall &amp; network protection → Allow an app through firewall</strong></bdi> بروید و فایل <code>hopdns.exe</code> را انتخاب کنید. اگر وای‌فای مطمئن خانه در ویندوز <bdi>Public</bdi> است، در تنظیمات همان اتصال آن را روی <bdi>Private</bdi> بگذارید. <a href="https://support.microsoft.com/en-us/windows/security/windows-security/firewall-and-network-protection-in-the-windows-security-app">راهنمای فایروال مایکروسافت (انگلیسی)</a></p>
+        </section>
+        <section class="guide-panel" id="firewall-macos">
+          <h3>مک</h3>
+          <p>اگر مک برای اتصال‌های ورودی <bdi>HopDNS</bdi> اجازه خواست، <bdi><strong>Allow</strong></bdi> را بزنید. برای بررسی دوباره، به <bdi><strong>System Settings → Network → Firewall → Options</strong></bdi> بروید و به <code>hopdns</code> اجازهٔ دریافت اتصال بدهید. <a href="https://support.apple.com/guide/mac-help/mh11783/mac">راهنمای فایروال اپل (انگلیسی)</a></p>
+        </section>
+        <section class="guide-panel" id="firewall-linux">
+          <h3>لینوکس</h3>
+          <p>اگر فایروال فعال است، اجازه دهید فقط نشانی محلی کنسول به پورت <code>53</code> (هم <bdi>TCP</bdi> و هم <bdi>UDP</bdi>) و پورت‌های <code>80</code> و <code>443</code> (با <bdi>TCP</bdi>) وصل شود. روش انجام این کار به نسخهٔ لینوکس بستگی دارد. <a href="https://documentation.ubuntu.com/security/security-features/network/firewall/">راهنمای فایروال اوبونتو (انگلیسی)</a></p>
+        </section>
         <p>فایروال را روشن نگه دارید. اگر کنسول در شبکهٔ خانگی است، نیازی به تغییر تنظیمات <bdi>Port Forwarding</bdi> مودم یا روتر نیست.</p>
       </details>
       <details>
-        <summary>شبکه و نشانی رایانه را بررسی کنید</summary>
-        <p>از وای‌فای معمولی خانه یا کابلی که به همان مودم یا روتر وصل است استفاده کنید. وای‌فای مهمان اغلب نمی‌گذارد دستگاه‌ها به هم وصل شوند. نشانی رایانه ممکن است بعد از خاموش و روشن کردن یا جابه‌جایی بین وای‌فای و کابل عوض شود. اگر تغییر کرده، برنامه را با نشانی جدید اجرا کنید و همان نشانی را در پنل و کنسول وارد کنید.</p>
+        <summary>شبکهٔ خانگی و وی‌پی‌ان را بررسی کنید</summary>
+        <p>از وای‌فای معمولی خانه یا کابلی که به همان مودم یا روتر وصل است استفاده کنید. وای‌فای مهمان اغلب نمی‌گذارد دستگاه‌ها به هم وصل شوند. اگر شبکه را عوض کردید یا پنل نشانی نشان نمی‌دهد، <bdi>HopDNS</bdi> را دوباره اجرا کنید و بخش <bdi><strong>Connect a device</strong></bdi> را بررسی کنید.</p>
+        <p><strong>از وی‌پی‌ان استفاده می‌کنید؟</strong> در تنظیمات وی‌پی‌ان رایانه، گزینهٔ دسترسی به شبکهٔ محلی را روشن کنید. این گزینه ممکن است <bdi><strong>Allow LAN traffic</strong></bdi>، <bdi><strong>Allow LAN connections</strong></bdi> یا <bdi><strong>Local network access</strong></bdi> نام داشته باشد. با این تنظیم، کنسول می‌تواند در شبکهٔ خانه به <bdi>HopDNS</bdi> وصل شود.</p>
       </details>
       <details>
         <summary>اگر سایتی باز نمی‌شود، حالت همهٔ دامنه‌ها را امتحان کنید</summary>

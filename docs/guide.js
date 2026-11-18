@@ -59,5 +59,7 @@ function setupTabs(tabList, initialPanel) {
   tabList.hidden = false;
 }
 
-setupTabs(document.getElementById('platform-tabs'), detectPlatform());
+const platform = detectPlatform();
+setupTabs(document.getElementById('platform-tabs'), platform);
 setupTabs(document.getElementById('console-tabs'), detectConsole());
+setupTabs(document.getElementById('firewall-tabs'), platform && 'firewall-' + platform);
